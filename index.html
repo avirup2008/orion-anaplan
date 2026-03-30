@@ -627,7 +627,7 @@ body { -webkit-font-smoothing: antialiased; }
 /* ═══════════════════════════════════════
    REPORT SCREEN
 ═══════════════════════════════════════ */
-#screen-report { background: var(--bg); }
+#screen-report { background: var(--bg); min-height: 0; }
 #screen-report.active { display: block; }
 
 /* Report header */
@@ -2912,79 +2912,392 @@ async function exportPDF() {
     const { jsPDF } = window.jspdf;
 
     // Hide the action bar and footer from the capture so they don't appear in PDF
-    const actionBar = document.querySelector('.report-action-bar');
-    const footer    = document.querySelector('.report-footer');
-    actionBar.style.display = 'none';
-    footer.style.display    = 'none';
+    const actionBar  = document.querySelector('.report-action-bar');
+    const footer     = document.querySelector('.report-footer');
+    const reportBody = document.querySelector('.report-body');
+    const masthead   = document.querySelector('.report-masthead');
+    actionBar.style.display        = 'none';
+    footer.style.display           = 'none';
+    reportBody.style.paddingBottom = '4px';
 
-    // Capture the entire report screen as ONE continuous canvas
     const reportEl = document.getElementById('screen-report');
     const scale    = 2;
-    const PDF_W_PX = 1240; // matches ~A4 at 150dpi
+    const PDF_W_PX = 1240;
+
+    // Measure true content bottom BEFORE capture using offsetTop/offsetHeight.
+    // These measure the element's own box, independent of the parent container's
+    // min-height inflation. Add masthead + body heights = all visible content.
+    const contentPx = masthead.offsetHeight + reportBody.offsetHeight + 20;
 
     const fullCanvas = await html2canvas(reportEl, {
       scale,
-      useCORS:     true,
-      logging:     false,
+      useCORS:         true,
+      logging:         false,
       backgroundColor: '#FAF8F0',
-      windowWidth: PDF_W_PX,
-      scrollX: 0,
-      scrollY: -window.scrollY,
-      width:  reportEl.scrollWidth,
-      height: reportEl.scrollHeight,
+      windowWidth:     PDF_W_PX,
+      scrollX:         0,
+      scrollY:         -window.scrollY,
+      width:           reportEl.scrollWidth,
+      height:          reportEl.scrollHeight,
     });
 
-    // Restore hidden elements
-    actionBar.style.display = '';
-    footer.style.display    = '';
+    // Restore hidden elements and padding
+    actionBar.style.display        = '';
+    footer.style.display           = '';
+    reportBody.style.paddingBottom = '';
 
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit:        'mm',
-      format:      'a4',
-    });
+    const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
 
-    const PAGE_W  = 210; // A4 width mm
-    const PAGE_H  = 297; // A4 height mm
+    const PAGE_W = 210;
+    const PAGE_H = 297;
 
-    const canvasW = fullCanvas.width;  // pixels at 2× scale
-    const canvasH = fullCanvas.height;
+    const canvasW  = fullCanvas.width;
+    const mmPerPx  = PAGE_W / (canvasW / scale);
 
-    // mm per canvas pixel (un-scaled)
-    const mmPerPx = PAGE_W / (canvasW / scale);
-    const totalMmH = (canvasH / scale) * mmPerPx;
+    // Cap totalMmH to actual content height — this prevents slicing into the
+    // blank region that min-height:100vh forces into the canvas.
+    // All pages remain standard A4; we simply stop before the blank.
+    const contentMmH = contentPx * mmPerPx;
+    const totalMmH   = Math.min((fullCanvas.height / scale) * mmPerPx, contentMmH);
 
-    let yMm = 0; // mm position into total canvas height
+    let yMm = 0;
     let isFirstPage = true;
 
     while (yMm < totalMmH) {
+      const sliceMmH = Math.min(PAGE_H, totalMmH - yMm);
+
       if (!isFirstPage) pdf.addPage();
       isFirstPage = false;
 
-      // How many mm fill this page (last page may be shorter)
-      const sliceMmH = Math.min(PAGE_H, totalMmH - yMm);
-
-      // Canvas pixel coordinates for this slice
-      const srcY = Math.round((yMm  / mmPerPx) * scale);
+      const srcY = Math.round((yMm      / mmPerPx) * scale);
       const srcH = Math.round((sliceMmH / mmPerPx) * scale);
 
-      // Draw just this slice into a temporary canvas
-      const sliceCanvas        = document.createElement('canvas');
-      sliceCanvas.width        = canvasW;
-      sliceCanvas.height       = Math.max(1, srcH);
-      const ctx                = sliceCanvas.getContext('2d');
-      // Fill background first to avoid transparent strips
-      ctx.fillStyle = '#FAF8F0';
+      const sliceCanvas   = document.createElement('canvas');
+      sliceCanvas.width   = canvasW;
+      sliceCanvas.height  = Math.max(1, srcH);
+      const ctx           = sliceCanvas.getContext('2d');
+      ctx.fillStyle       = '#FAF8F0';
       ctx.fillRect(0, 0, canvasW, sliceCanvas.height);
       ctx.drawImage(fullCanvas, 0, srcY, canvasW, srcH, 0, 0, canvasW, srcH);
 
       const imgData = sliceCanvas.toDataURL('image/jpeg', 0.94);
       pdf.addImage(imgData, 'JPEG', 0, 0, PAGE_W, sliceMmH);
 
-      yMm += PAGE_H; // always advance a full page (last slice is shorter but next iteration exits)
+      yMm += PAGE_H;
     }
 
     const datePart = new Date().toISOString().slice(0, 10);
+
+    // ── Atlas Data Page ───────────────────────────────────────────────────────
+    // Native jsPDF text layer — machine-readable by Atlas on upload.
+    // Visual report pages above are unchanged (html2canvas image slices).
+    pdf.addPage();
+
+    const _pmi       = getPMI();
+    const _band      = getBand(_pmi);
+    const _blockers  = getCriticalBlockers();
+    const _flags     = getFlags();
+    const _fit       = getToolFit(_blockers, _flags);
+
+    const atlasPayload = {
+      v:         1,
+      generated: new Date().toISOString(),
+      pmi:       _pmi,
+      band:      _band.label,
+      verdict:   _fit.label,
+      dims: {
+        demand:     getDimScore('Demand Process')        ?? 0,
+        supply:     getDimScore('Supply Process')        ?? 0,
+        finance:    getDimScore('Financial Integration') ?? 0,
+        data:       getDimScore('Data Infrastructure')   ?? 0,
+        governance: getDimScore('Governance & People')   ?? 0,
+      },
+      answers: {
+        scope:      answers['q1']   || null,
+        users:      answers['q2']   || null,
+        erp:        answers['q11']  || null,
+        erp_detail: answers['q11b'] || null,
+        masterdata: answers['q12']  || null,
+        capability: answers['q14']  || null,
+        process:    answers['q15']  || null,
+      },
+      blockers: _blockers.map(b => ({ type: b.type, title: b.title })),
+      flags:    _flags.map(f    => ({ type: f.type, title: f.title })),
+    };
+
+    const payloadStr = JSON.stringify(atlasPayload);
+    const DELIM      = '~~ATLAS~~';
+    const LM         = 18;   // left margin mm
+    let   cy         = 24;   // current y position mm
+
+    // Canvas background
+    pdf.setFillColor(250, 248, 240);
+    pdf.rect(0, 0, 210, 297, 'F');
+
+    // Top rule — gold
+    pdf.setDrawColor(191, 128, 30);
+    pdf.setLineWidth(0.6);
+    pdf.line(LM, cy, 192, cy);
+    cy += 6;
+
+    // Title
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(9);
+    pdf.setTextColor(23, 90, 166);
+    pdf.text('ORION  \u00B7  ATLAS DATA HANDOFF', LM, cy);
+    cy += 5;
+
+    // Sub-title
+    pdf.setFont('courier', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(89, 94, 107);
+    pdf.text('EyeOn Planning Intelligence  \u00B7  orion-eyeon.vercel.app', LM, cy);
+    cy += 4;
+
+    // Bottom rule — gold
+    pdf.setDrawColor(191, 128, 30);
+    pdf.line(LM, cy, 192, cy);
+    cy += 8;
+
+    // Instruction line
+    pdf.setFontSize(7.5);
+    pdf.setFont('courier', 'normal');
+    pdf.setTextColor(89, 94, 107);
+    pdf.text('This page is machine-readable by Atlas. Upload this PDF at atlas-eyeon.vercel.app', LM, cy);
+    cy += 4;
+    pdf.text('to pre-populate your architecture assessment with this Orion evaluation.', LM, cy);
+    cy += 10;
+
+    // ── Section: Assessment Summary ───────────────────────────────────────────
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(89, 94, 107);
+    pdf.text('ASSESSMENT SUMMARY', LM, cy);
+    cy += 4;
+    pdf.setDrawColor(220, 216, 208);
+    pdf.setLineWidth(0.3);
+    pdf.line(LM, cy, 192, cy);
+    cy += 6;
+
+    // PMI + Verdict row
+    const _scopeLabel = {A:'Finance Planning',B:'Supply Chain Planning',C:'Cross-Functional Connected Planning',D:'Scope TBD'}[atlasPayload.answers.scope] || '—';
+    const _erpLabel   = {A:'SAP ECC 6.0',B:'SAP S/4HANA',C:'Oracle ERP',D:'Other / Infor / Bespoke'}[atlasPayload.answers.erp] || '—';
+    const _usersLabel = {A:'< 15 users',B:'15–50 users',C:'50–150 users',D:'> 150 users'}[atlasPayload.answers.users] || '—';
+    const _mdLabel    = {A:'Critical issues',B:'Partial quality',C:'Mostly clean',D:'Well governed'}[atlasPayload.answers.masterdata] || '—';
+    const _capLabel   = {A:'No capability',B:'One resource',C:'Small team',D:'Established CoE'}[atlasPayload.answers.capability] || '—';
+    const _procLabel  = {A:'Informal',B:'Partially structured',C:'Documented',D:'Governed'}[atlasPayload.answers.process] || '—';
+
+    // PMI score block
+    pdf.setFillColor(242, 239, 232);
+    pdf.roundedRect(LM, cy, 80, 18, 2, 2, 'F');
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(18);
+    pdf.setTextColor(28, 33, 41);
+    pdf.text(String(_pmi), LM + 6, cy + 12);
+    pdf.setFontSize(7);
+    pdf.setTextColor(89, 94, 107);
+    pdf.text('/ 100  PLANNING MATURITY INDEX', LM + 20, cy + 8);
+    pdf.setFont('courier', 'normal');
+    pdf.text(_band.label.toUpperCase(), LM + 20, cy + 13);
+
+    // Verdict block
+    const _vColor = _fit.label === 'Strong Fit' ? [33,115,72] : _fit.label === 'Conditional Fit' ? [191,128,30] : [184,46,46];
+    pdf.setFillColor(..._vColor);
+    pdf.roundedRect(110, cy, 82, 18, 2, 2, 'F');
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text('ANAPLAN FIT VERDICT', 114, cy + 7);
+    pdf.setFontSize(8.5);
+    pdf.text(_fit.label ? _fit.label.toUpperCase() : 'SEE REPORT', 114, cy + 13);
+    cy += 24;
+
+    // ── Dimension Scores table ────────────────────────────────────────────────
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(89, 94, 107);
+    pdf.text('DIMENSION SCORES', LM, cy);
+    cy += 5;
+
+    const dims = [
+      ['Demand Process',        atlasPayload.dims.demand,     '#C8733A'],
+      ['Supply Process',        atlasPayload.dims.supply,     '#2E8B57'],
+      ['Financial Integration', atlasPayload.dims.finance,    '#175AA6'],
+      ['Data Infrastructure',   atlasPayload.dims.data,       '#1A7F8A'],
+      ['Governance & People',   atlasPayload.dims.governance, '#7047A3'],
+    ];
+
+    dims.forEach(([label, score, hexCol]) => {
+      // Row background
+      pdf.setFillColor(242, 239, 232);
+      pdf.roundedRect(LM, cy - 3.5, 174, 8, 1, 1, 'F');
+
+      // Colour dot
+      const rgb = parseInt(hexCol.slice(1), 16);
+      pdf.setFillColor((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
+      pdf.circle(LM + 3.5, cy + 0.5, 1.5, 'F');
+
+      // Label
+      pdf.setFont('courier', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(28, 33, 41);
+      pdf.text(label, LM + 8, cy + 1.5);
+
+      // Score bar background
+      const barX = 110, barW = 54, barH = 3;
+      pdf.setFillColor(220, 216, 208);
+      pdf.roundedRect(barX, cy - 1, barW, barH, 1, 1, 'F');
+
+      // Score bar fill
+      const fill = Math.max(2, (score / 100) * barW);
+      const ragR = score < 34 ? [184,46,46] : score < 60 ? [191,128,30] : [33,115,72];
+      pdf.setFillColor(...ragR);
+      pdf.roundedRect(barX, cy - 1, fill, barH, 1, 1, 'F');
+
+      // Score number
+      pdf.setFont('courier', 'bold');
+      pdf.setFontSize(7);
+      pdf.setTextColor(28, 33, 41);
+      pdf.text(String(score), 168, cy + 1.5);
+
+      cy += 10;
+    });
+
+    cy += 4;
+
+    // ── Context answers table ─────────────────────────────────────────────────
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(89, 94, 107);
+    pdf.text('ASSESSMENT CONTEXT', LM, cy);
+    cy += 5;
+
+    const ctxRows = [
+      ['Planning Scope',      _scopeLabel],
+      ['ERP System',          _erpLabel],
+      ['User Population',     _usersLabel],
+      ['Master Data Quality', _mdLabel],
+      ['Internal Capability', _capLabel],
+      ['Process Governance',  _procLabel],
+    ];
+
+    ctxRows.forEach(([key, val], i) => {
+      if (i % 2 === 0) {
+        pdf.setFillColor(242, 239, 232);
+        pdf.rect(LM, cy - 3.5, 174, 8, 'F');
+      }
+      pdf.setFont('courier', 'bold');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(89, 94, 107);
+      pdf.text(key.toUpperCase(), LM + 2, cy + 1.5);
+      pdf.setFont('courier', 'normal');
+      pdf.setTextColor(28, 33, 41);
+      pdf.text(val, 90, cy + 1.5);
+      cy += 9;
+    });
+
+    cy += 4;
+
+    // ── Blockers & Flags ──────────────────────────────────────────────────────
+    if (atlasPayload.blockers.length > 0 || atlasPayload.flags.length > 0) {
+      pdf.setFont('courier', 'bold');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(89, 94, 107);
+      pdf.text('CONDITIONS FLAGGED', LM, cy);
+      cy += 5;
+
+      atlasPayload.blockers.forEach(b => {
+        pdf.setFillColor(255, 243, 243);
+        pdf.rect(LM, cy - 3.5, 174, 8, 'F');
+        pdf.setDrawColor(184, 46, 46);
+        pdf.setLineWidth(0.8);
+        pdf.line(LM, cy - 3.5, LM, cy + 4.5);
+        pdf.setFont('courier', 'bold');
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(184, 46, 46);
+        pdf.text('HARD BLOCKER', LM + 4, cy + 1);
+        pdf.setFont('courier', 'normal');
+        pdf.setTextColor(28, 33, 41);
+        const bTitle = pdf.splitTextToSize(b.title, 130);
+        pdf.text(bTitle[0], LM + 36, cy + 1);
+        cy += 10;
+      });
+
+      atlasPayload.flags.forEach(f => {
+        pdf.setFillColor(255, 250, 240);
+        pdf.rect(LM, cy - 3.5, 174, 8, 'F');
+        pdf.setDrawColor(191, 128, 30);
+        pdf.setLineWidth(0.8);
+        pdf.line(LM, cy - 3.5, LM, cy + 4.5);
+        pdf.setFont('courier', 'bold');
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(191, 128, 30);
+        pdf.text('FLAG', LM + 4, cy + 1);
+        pdf.setFont('courier', 'normal');
+        pdf.setTextColor(28, 33, 41);
+        const fTitle = pdf.splitTextToSize(f.title, 140);
+        pdf.text(fTitle[0], LM + 20, cy + 1);
+        cy += 10;
+      });
+
+      cy += 4;
+    }
+
+    // ── Mid rule before machine section ───────────────────────────────────────
+    // If cy is close to page bottom, start a new page for the payload
+    // so it never gets truncated regardless of how many blockers/flags exist.
+    const PAGE_BOTTOM = 280; // mm — safe bottom margin
+    if (cy > PAGE_BOTTOM - 40) {
+      pdf.addPage();
+      pdf.setFillColor(250, 248, 240);
+      pdf.rect(0, 0, 210, 297, 'F');
+      cy = 20;
+    }
+
+    pdf.setDrawColor(191, 128, 30);
+    pdf.setLineWidth(0.4);
+    pdf.line(LM, cy, 192, cy);
+    cy += 6;
+
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(89, 94, 107);
+    pdf.text('MACHINE-READABLE PAYLOAD  \u00B7  DO NOT EDIT', LM, cy);
+    cy += 6;
+
+    // Opening delimiter
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(7);
+    pdf.setTextColor(28, 33, 41);
+    pdf.text(DELIM, LM, cy);
+    cy += 5;
+
+    // JSON payload — wrapped to page width
+    pdf.setFont('courier', 'normal');
+    pdf.setFontSize(6.5);
+    const splitPayload = pdf.splitTextToSize(payloadStr, 174);
+    pdf.text(splitPayload, LM, cy);
+    cy += (splitPayload.length * 3.2) + 5;
+
+    // Closing delimiter
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(7);
+    pdf.text(DELIM, LM, cy);
+    cy += 8;
+
+    // Footer rule
+    pdf.setDrawColor(191, 128, 30);
+    pdf.setLineWidth(0.6);
+    pdf.line(LM, cy, 192, cy);
+    cy += 5;
+
+    // Footer text
+    pdf.setFont('courier', 'normal');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(89, 94, 107);
+    pdf.text(`Generated: ${datePart}  \u00B7  Orion v7  \u00B7  EyeOn Planning Intelligence`, LM, cy);
+    // ── End Atlas Data Page ───────────────────────────────────────────────────
+
     pdf.save(`Orion-Report-${datePart}.pdf`);
 
     showPdfToast('Report downloaded ✓');
@@ -2995,8 +3308,10 @@ async function exportPDF() {
     // Ensure elements are restored even on error
     const ab = document.querySelector('.report-action-bar');
     const ft = document.querySelector('.report-footer');
+    const rb = document.querySelector('.report-body');
     if (ab) ab.style.display = '';
     if (ft) ft.style.display = '';
+    if (rb) rb.style.paddingBottom = '';
     showPdfToast('Export failed — please try again');
     setTimeout(hidePdfToast, 3000);
   } finally {
