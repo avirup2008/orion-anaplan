@@ -1,0 +1,3009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Orion · EyeOn Planning Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* ═══════════════════════════════════════
+   TOKENS — exact Meridian palette
+═══════════════════════════════════════ */
+:root {
+  --bg:        #FAF8F0;
+  --bg2:       #F2EFE8;
+  --surface:   #FFFDF8;
+  --surface2:  #F5F2EA;
+  --surface3:  #EBE8E0;
+
+  --text:      #1C2129;
+  --text2:     #595E6B;
+  --text3:     #9EA1AB;
+  --text4:     #B8BABE;
+
+  --accent:    #175AA6;
+  --accent2:   #3B7FC4;
+  --accent-pale: rgba(23,90,166,0.09);
+  --accent-bd: rgba(23,90,166,0.22);
+
+  --gold:      #BF801E;
+  --gold2:     #D4960F;
+  --gold3:     #E8B847;
+  --gold-pale: rgba(191,128,30,0.10);
+  --gold-bd:   rgba(191,128,30,0.28);
+
+  --pos:       #217348;
+  --pos-pale:  rgba(33,115,72,0.09);
+  --pos-bd:    rgba(33,115,72,0.22);
+  --neg:       #B82E2E;
+  --neg-pale:  rgba(184,46,46,0.09);
+  --neg-bd:    rgba(184,46,46,0.22);
+  --warn:      #BF801E;
+  --warn-pale: rgba(191,128,30,0.09);
+  --warn-bd:   rgba(191,128,30,0.22);
+
+  --border:    rgba(28,33,41,0.08);
+  --border2:   rgba(28,33,41,0.12);
+  --border3:   rgba(28,33,41,0.18);
+  --rule:      #DED9CF;
+
+  --shadow-xs: 0 1px 3px rgba(28,33,41,0.05);
+  --shadow-sm: 0 1px 3px rgba(28,33,41,0.06),0 1px 2px rgba(28,33,41,0.04);
+  --shadow:    0 4px 16px rgba(28,33,41,0.08),0 2px 6px rgba(28,33,41,0.05);
+  --shadow-lg: 0 12px 40px rgba(28,33,41,0.10),0 4px 12px rgba(28,33,41,0.06);
+  --shadow-xl: 0 20px 60px rgba(28,33,41,0.12),0 8px 20px rgba(28,33,41,0.07);
+
+  --radius:    10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* Dimension colours */
+  --d-demand:  #C8733A;
+  --d-supply:  #2E8B57;
+  --d-finance: #175AA6;
+  --d-data:    #1A7F8A;
+  --d-gov:     #7047A3;
+
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); }
+body { -webkit-font-smoothing: antialiased; }
+
+/* ═══════════════════════════════════════
+   SCREEN SYSTEM
+═══════════════════════════════════════ */
+.screen { display: none; min-height: 100vh; }
+.screen.active { display: block; }
+#screen-intro.active { display: flex; }
+#screen-calc.active  { display: flex; }
+
+/* ═══════════════════════════════════════
+   INTRO SCREEN — unified canvas layout
+═══════════════════════════════════════ */
+#screen-intro {
+  min-height: 100vh;
+  background: var(--bg);
+  padding: 0;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.intro-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+  /* Single seamless background — no divider */
+  background: var(--bg);
+}
+
+/* ── LEFT HERO PANEL — same canvas colour, no border ── */
+.intro-hero {
+  background: var(--bg);     /* identical to right — no colour seam */
+  border-right: none;        /* explicit kill */
+  display: flex;
+  align-items: center;
+  justify-content: center;   /* card truly centred in left half */
+  padding: 106px 40px 60px 60px;
+  position: relative;
+  overflow: hidden;
+}
+.intro-hero::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 480px; height: 480px;
+  background: radial-gradient(ellipse, rgba(191,128,30,0.065) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+.hero-card-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 292px;
+  position: relative;
+  z-index: 1;
+}
+.hero-score-card {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-xl);
+  padding: 26px 28px;
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+}
+.hero-score-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--text4);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 18px;
+}
+.hero-gauge-wrap { display: flex; justify-content: center; margin-bottom: 16px; }
+.hero-stage-chip { display: flex; justify-content: center; margin-bottom: 18px; }
+.hero-stage-chip span {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--gold-pale); border: 1px solid var(--gold-bd);
+  border-radius: 100px; padding: 4px 13px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; font-weight: 600; color: var(--gold); letter-spacing: 0.8px;
+}
+.hero-stage-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
+.hero-dim-bars { display: flex; flex-direction: column; gap: 7px; }
+.hero-dim-row { display: flex; align-items: center; gap: 9px; }
+.hero-dim-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.hero-dim-track { flex: 1; height: 3px; background: var(--surface3); border-radius: 100px; overflow: hidden; }
+.hero-dim-fill { height: 100%; border-radius: 100px; }
+.hero-dim-num { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--text4); width: 20px; text-align: right; }
+.hero-card-rule {
+  margin-top: 16px; height: 2px;
+  background: linear-gradient(to right, transparent, rgba(191,128,30,0.32), transparent);
+  border-radius: 100px;
+}
+.hero-verdict-chip {
+  background: var(--surface); border: 1px solid var(--gold-bd);
+  border-radius: var(--radius); padding: 11px 16px;
+  box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px; width: 100%;
+}
+.hero-verdict-icon {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: var(--gold-pale); display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.hero-verdict-title { font-size: 11px; font-weight: 700; color: var(--gold); line-height: 1.2; }
+.hero-verdict-sub { font-size: 10px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; margin-top: 1px; }
+
+/* ── RIGHT CONTENT PANEL ── */
+.intro-content {
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* top: 100px clears the absolute nav bar (nav is ~86px) */
+  padding: 106px 72px 60px 56px;
+}
+
+/* Constrain content block so long lines don't stretch — optimal ~60ch */
+.intro-content-inner {
+  max-width: 480px;
+}
+
+/* ── INTRO TOP NAV ── */
+.intro-nav {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
+  padding: 24px 52px;
+  display: flex;
+  align-items: center;
+}
+.intro-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.intro-nav-icon {
+  width: 38px; height: 38px;
+  background: var(--text);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+}
+.intro-nav-icon svg { width: 20px; height: 20px; }
+.intro-nav-name {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  line-height: 1;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+.intro-nav-name em {
+  font-style: normal;
+  color: var(--accent);
+}
+.intro-nav-by {
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  margin-top: 3px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* Headline — commanding scale, tight tracking */
+.intro-headline {
+  font-size: clamp(2.8rem, 4.2vw, 3.8rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  color: var(--text);
+  margin-bottom: 20px;
+}
+.intro-headline em { font-style: normal; color: var(--accent); }
+
+/* Body copy — proportional to headline, max 65ch */
+.intro-sub {
+  font-size: 16px;
+  color: var(--text2);
+  line-height: 1.7;
+  margin-bottom: 36px;
+  font-weight: 400;
+  max-width: 440px;
+}
+
+/* Stats strip */
+.intro-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: var(--radius-lg); overflow: hidden;
+  box-shadow: var(--shadow); margin-bottom: 24px;
+}
+.intro-stat { padding: 15px 16px; border-right: 1px solid var(--border); }
+.intro-stat:last-child { border-right: none; }
+.intro-stat-val {
+  font-size: 14px; font-weight: 700; color: var(--accent);
+  letter-spacing: -0.01em; margin-bottom: 3px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.intro-stat-lbl { font-size: 9.5px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 500; }
+
+/* CTA — full width of content block */
+.btn-cta {
+  width: 100%; padding: 15px 24px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: var(--radius);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 14px; font-weight: 600; letter-spacing: 0.3px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+  transition: background 0.15s, transform 0.12s;
+  box-shadow: 0 2px 16px rgba(23,90,166,0.32);
+}
+.btn-cta:hover { background: var(--accent2); transform: translateY(-1px); box-shadow: 0 4px 20px rgba(23,90,166,0.38); }
+.btn-cta:active { transform: translateY(0); }
+
+.intro-foot {
+  text-align: left; margin-top: 18px;
+  font-size: 10px; color: var(--text4);
+  font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.3px;
+}
+
+@media (max-width: 860px) {
+  .intro-split { grid-template-columns: 1fr; }
+  .intro-hero { display: none; }
+  .intro-content { padding: 52px 32px; }
+  .intro-content-inner { max-width: 100%; }
+}
+
+/* ═══════════════════════════════════════
+   ASSESSMENT SCREEN
+═══════════════════════════════════════ */
+#screen-assess {
+  background: var(--bg);
+  padding-bottom: 80px;
+}
+#screen-assess.active { display: block; }
+
+/* Sticky header */
+.assess-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border2);
+  position: sticky; top: 0; z-index: 100;
+  padding: 0;
+}
+.assess-header-inner {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.assess-logo {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 3.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  flex-shrink: 0;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.progress-track {
+  flex: 1;
+  height: 3px;
+  background: var(--surface3);
+  border-radius: 100px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 100px;
+  transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+.progress-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text3);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Question area */
+.assess-body {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 44px 24px 0;
+}
+
+/* Dimension pill */
+.q-dim-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  border: 1px solid;
+}
+.q-dim-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.q-counter {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text3);
+  margin-bottom: 10px;
+  letter-spacing: 0.3px;
+}
+
+.q-text {
+  font-size: clamp(1.15rem, 3vw, 1.45rem);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+  margin-bottom: 28px;
+  letter-spacing: -0.01em;
+}
+
+/* Branch indicator */
+.branch-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--gold-pale);
+  border: 1px solid var(--gold-bd);
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 14px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* Options */
+.options { display: flex; flex-direction: column; gap: 9px; margin-bottom: 32px; }
+
+.opt {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 15px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  cursor: pointer;
+  transition: border-color 0.14s, background 0.14s, box-shadow 0.14s, transform 0.1s;
+  box-shadow: var(--shadow-xs);
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+}
+.opt:hover {
+  border-color: var(--border3);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transform: translateX(2px);
+}
+.opt.selected {
+  background: var(--accent-pale);
+  border-color: var(--accent-bd);
+  box-shadow: var(--shadow-sm);
+}
+.opt-indicator {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border3);
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.14s, background 0.14s;
+}
+.opt.selected .opt-indicator {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.opt-indicator svg { display: none; }
+.opt.selected .opt-indicator svg { display: block; }
+
+.opt-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  flex-shrink: 0;
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+  min-width: 16px;
+}
+.opt.selected .opt-label { color: var(--accent); }
+
+.opt-text {
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--text2);
+  line-height: 1.45;
+}
+.opt.selected .opt-text { color: var(--text); }
+
+/* Nav buttons */
+.q-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.btn-back {
+  padding: 10px 18px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.14s;
+}
+.btn-back:hover { background: var(--surface2); color: var(--text); }
+
+.btn-next {
+  padding: 10px 24px;
+  background: var(--text);
+  border: 1px solid var(--text);
+  border-radius: var(--radius);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bg);
+  cursor: pointer;
+  transition: all 0.14s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
+}
+.btn-next:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+.btn-next:disabled {
+  background: var(--surface3);
+  border-color: var(--border2);
+  color: var(--text3);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Slide animation */
+.q-wrap { animation: qIn 0.28s cubic-bezier(0.4,0,0.2,1); }
+@keyframes qIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+.q-wrap.leaving { animation: qOut 0.2s ease forwards; }
+@keyframes qOut { from { opacity:1; transform:translateY(0); } to { opacity:0; transform:translateY(-8px); } }
+
+/* ═══════════════════════════════════════
+   CALCULATING SCREEN
+═══════════════════════════════════════ */
+#screen-calc {
+  min-height: 100vh;
+  background: var(--bg);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+
+.calc-inner { text-align: center; max-width: 400px; width: 100%; }
+
+/* Spinner ring */
+.calc-ring {
+  width: 64px; height: 64px;
+  margin: 0 auto 32px;
+  position: relative;
+}
+.calc-ring svg {
+  width: 64px; height: 64px;
+  animation: spin 1.4s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.calc-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+}
+.calc-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 36px;
+}
+
+.calc-steps { display: flex; flex-direction: column; gap: 10px; }
+.calc-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  opacity: 0.3;
+  transition: opacity 0.35s, border-color 0.35s, background 0.35s;
+}
+.calc-step.active {
+  opacity: 1;
+  border-color: var(--accent-bd);
+  background: var(--accent-pale);
+}
+.calc-step.done {
+  opacity: 1;
+  border-color: var(--pos-bd);
+  background: var(--pos-pale);
+}
+.calc-step-dot {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--surface3);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.calc-step.active .calc-step-dot { background: var(--accent); }
+.calc-step.done .calc-step-dot { background: var(--pos); }
+.calc-step-text {
+  font-size: 12px;
+  color: var(--text2);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.2px;
+}
+.calc-step.active .calc-step-text { color: var(--accent); }
+.calc-step.done .calc-step-text { color: var(--pos); }
+
+/* ═══════════════════════════════════════
+   REPORT SCREEN
+═══════════════════════════════════════ */
+#screen-report { background: var(--bg); }
+#screen-report.active { display: block; }
+
+/* Report header */
+.report-masthead {
+  background: var(--text);
+  padding: 44px 0 40px;
+  position: relative;
+  overflow: hidden;
+}
+.report-masthead::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 40%; height: 100%;
+  background: linear-gradient(to right, transparent, rgba(201,148,58,0.06));
+  pointer-events: none;
+}
+.report-mast-inner {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 28px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 40px;
+}
+.report-eyeon {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+  margin-bottom: 12px;
+}
+.report-title {
+  font-size: clamp(1.6rem, 4vw, 2.3rem);
+  font-weight: 600;
+  color: #FFFDF8;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin-bottom: 10px;
+}
+.report-meta {
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.3px;
+}
+
+/* PMI Gauge */
+.pmi-gauge-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.pmi-gauge { position: relative; width: 120px; height: 120px; }
+.pmi-gauge canvas,
+.pmi-gauge svg.gauge-svg { position: absolute; top: 0; left: 0; }
+.pmi-gauge-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.pmi-gauge-num {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #FFFDF8;
+  letter-spacing: -0.04em;
+  font-family: 'IBM Plex Mono', monospace;
+  line-height: 1;
+}
+.pmi-gauge-denom {
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+  font-family: 'IBM Plex Mono', monospace;
+  margin-top: 2px;
+}
+.pmi-gauge-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* Report body */
+.report-body {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 36px 28px 80px;
+}
+
+/* Section labels */
+.r-section-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text3);
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border2);
+  margin-top: 32px;
+}
+
+/* Dimension grid */
+.dim-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+@media(max-width:540px) { .dim-grid { grid-template-columns: 1fr; } }
+
+.dim-card {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-xs);
+}
+.dim-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.dim-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+}
+.dim-card-score {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+}
+.dim-bar-track {
+  height: 5px;
+  background: var(--surface3);
+  border-radius: 100px;
+  overflow: hidden;
+}
+.dim-bar-fill {
+  height: 100%;
+  border-radius: 100px;
+  transition: width 1.1s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* Band label under score cards */
+.band-label {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-bottom: 28px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.band-badge {
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  flex-shrink: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-top: 1px;
+}
+.band-text { font-size: 13px; color: var(--text2); line-height: 1.55; }
+.band-ref { font-size: 11px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; margin-top: 5px; letter-spacing: 0.3px; }
+
+/* Fit verdict card */
+.fit-card {
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  margin-bottom: 28px;
+  border: 1px solid;
+}
+.fit-card.strong { background: var(--pos-pale); border-color: var(--pos-bd); }
+.fit-card.conditional { background: var(--warn-pale); border-color: var(--warn-bd); }
+.fit-card.notready { background: var(--neg-pale); border-color: var(--neg-bd); }
+.fit-verdict-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.fit-verdict-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-size: 15px;
+}
+.fit-card.strong .fit-verdict-icon { background: rgba(33,115,72,0.15); }
+.fit-card.conditional .fit-verdict-icon { background: rgba(191,128,30,0.15); }
+.fit-card.notready .fit-verdict-icon { background: rgba(184,46,46,0.15); }
+.fit-verdict-title { font-weight: 700; font-size: 15px; }
+.fit-card.strong .fit-verdict-title { color: var(--pos); }
+.fit-card.conditional .fit-verdict-title { color: var(--warn); }
+.fit-card.notready .fit-verdict-title { color: var(--neg); }
+.fit-verdict-body { font-size: 13.5px; color: var(--text2); line-height: 1.65; }
+
+/* Flag cards */
+.flag-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 9px;
+  border: 1px solid;
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+  box-shadow: var(--shadow-xs);
+}
+.flag-card.hard { border-color: var(--neg-bd); background: var(--neg-pale); }
+.flag-card.soft { border-color: var(--warn-bd); background: var(--warn-pale); }
+.flag-card.info { border-color: var(--accent-bd); background: var(--accent-pale); }
+.flag-icon-wrap {
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+.flag-card.hard .flag-icon-wrap { background: rgba(184,46,46,0.15); }
+.flag-card.soft .flag-icon-wrap { background: rgba(191,128,30,0.15); }
+.flag-card.info .flag-icon-wrap { background: rgba(23,90,166,0.12); }
+.flag-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+.flag-card.hard .flag-title { color: var(--neg); }
+.flag-card.soft .flag-title { color: var(--warn); }
+.flag-card.info .flag-title { color: var(--accent); }
+.flag-body { font-size: 12.5px; color: var(--text2); line-height: 1.6; }
+.flag-source { font-size: 10px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; margin-top: 6px; letter-spacing: 0.3px; }
+
+/* Capability cards */
+.cap-card {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+}
+.cap-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.cap-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+.cap-phase {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 3px 9px;
+  border-radius: 100px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.cap-phase.p1 { background: var(--accent-pale); color: var(--accent); border: 1px solid var(--accent-bd); }
+.cap-phase.p2 { background: var(--pos-pale); color: var(--pos); border: 1px solid var(--pos-bd); }
+.cap-phase.pre { background: var(--neg-pale); color: var(--neg); border: 1px solid var(--neg-bd); }
+.cap-phase.par { background: var(--gold-pale); color: var(--gold); border: 1px solid var(--gold-bd); }
+.cap-body { font-size: 13px; color: var(--text2); line-height: 1.65; margin-bottom: 12px; }
+.cap-detail {
+  background: var(--bg2);
+  border-radius: 8px;
+  padding: 11px 14px;
+  border-left: 3px solid var(--accent);
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+.cap-source {
+  font-size: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--text3);
+  margin-top: 10px;
+  letter-spacing: 0.3px;
+}
+
+/* Roadmap */
+.roadmap { position: relative; }
+.roadmap::before {
+  content: '';
+  position: absolute;
+  left: 22px; top: 24px; bottom: 24px;
+  width: 1.5px;
+  background: var(--rule);
+}
+.phase-row { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 14px; position: relative; }
+.phase-num-badge {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 700; font-size: 14px;
+  flex-shrink: 0; z-index: 1;
+  box-shadow: var(--shadow);
+}
+.phase-content {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-xs);
+}
+.phase-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+.phase-meta { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text3); margin-bottom: 10px; letter-spacing: 0.3px; }
+.phase-items { display: flex; flex-direction: column; gap: 5px; }
+.phase-item { font-size: 12.5px; color: var(--text2); display: flex; gap: 8px; line-height: 1.45; }
+.phase-item::before { content: '→'; color: var(--text4); flex-shrink: 0; font-family: 'IBM Plex Mono', monospace; }
+
+/* Sources box */
+.sources-box {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-top: 8px;
+}
+.sources-box p { font-size: 12px; color: var(--text2); line-height: 1.7; }
+.sources-box strong { font-weight: 600; color: var(--text); }
+
+/* Report footer */
+.report-footer {
+  background: var(--text);
+  padding: 24px 0;
+}
+.report-footer-inner {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.report-footer p { font-size: 11px; color: rgba(255,255,255,0.3); font-family: 'IBM Plex Mono', monospace; }
+.report-footer strong { color: rgba(255,255,255,0.5); }
+.btn-restart {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  color: rgba(255,255,255,0.45);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-restart:hover { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.7); }
+
+/* Report action bar — sits above the dark footer */
+.report-action-bar {
+  background: var(--surface);
+  border-top: 1px solid var(--border2);
+  border-bottom: 1px solid var(--border2);
+  padding: 20px 0;
+}
+.report-action-inner {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 28px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.btn-action-pdf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 12px 24px;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.12s;
+  box-shadow: 0 2px 12px rgba(23,90,166,0.28);
+}
+.btn-action-pdf:hover { background: var(--accent2); transform: translateY(-1px); }
+.btn-action-pdf:active { transform: translateY(0); }
+.btn-action-pdf:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.btn-action-restart {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 12px 22px;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-action-restart:hover { background: var(--surface2); color: var(--text); border-color: var(--border3); }
+
+/* PDF export progress toast */
+.pdf-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--text);
+  color: #FFFDF8;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius);
+  padding: 12px 22px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow-xl);
+  z-index: 9999;
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  white-space: nowrap;
+}
+.pdf-toast.visible { transform: translateX(-50%) translateY(0); }
+
+/* ── EXECUTIVE SUMMARY ── */
+.exec-summary {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 24px 26px;
+  margin-bottom: 28px;
+  box-shadow: var(--shadow-sm);
+}
+.exec-summary-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text3);
+  margin-bottom: 14px;
+}
+.exec-summary p {
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.75;
+  margin-bottom: 12px;
+}
+.exec-summary p:last-child { margin-bottom: 0; }
+.exec-summary p strong { color: var(--text); font-weight: 600; }
+.exec-summary p em { font-style: normal; color: var(--accent); font-weight: 500; }
+
+/* ── DIMENSION DEEP-DIVE CARDS ── */
+.dim-deep {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-xs);
+}
+.dim-deep-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.dim-deep-left { display: flex; align-items: center; gap: 12px; }
+.dim-deep-swatch {
+  width: 4px;
+  height: 38px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.dim-deep-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.dim-deep-stage {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 0.3px;
+}
+.dim-deep-right { text-align: right; }
+.dim-deep-score {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.dim-bar-wrap { width: 100px; }
+.dim-deep-body {
+  padding: 14px 18px 16px;
+}
+.dim-narrative {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.65;
+  margin-bottom: 12px;
+}
+.dim-insight {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--bg2);
+  border-radius: 8px;
+  padding: 10px 13px;
+  border-left: 3px solid;
+}
+.dim-insight-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: 3px;
+}
+.dim-insight-text {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.5;
+}
+
+/* ── READINESS MATRIX ── */
+.readiness-matrix {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 28px;
+  box-shadow: var(--shadow-sm);
+}
+.rm-header {
+  display: grid;
+  grid-template-columns: 180px 1fr 1fr 1fr;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border2);
+}
+.rm-header-cell {
+  padding: 10px 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text3);
+  border-right: 1px solid var(--border);
+}
+.rm-header-cell:last-child { border-right: none; }
+.rm-row {
+  display: grid;
+  grid-template-columns: 180px 1fr 1fr 1fr;
+  border-bottom: 1px solid var(--border);
+}
+.rm-row:last-child { border-bottom: none; }
+.rm-cell {
+  padding: 12px 14px;
+  font-size: 12.5px;
+  color: var(--text2);
+  border-right: 1px solid var(--border);
+  line-height: 1.45;
+}
+.rm-cell:last-child { border-right: none; }
+.rm-dim-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rm-dim-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.rm-dim-name { font-size: 12px; font-weight: 600; color: var(--text); }
+.rag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.rag.green { background: var(--pos-pale); color: var(--pos); }
+.rag.amber { background: var(--warn-pale); color: var(--warn); }
+.rag.red   { background: var(--neg-pale);  color: var(--neg); }
+.rag::before { content: '●'; font-size: 8px; }
+
+/* ── ENRICHED CAPABILITY CARDS ── */
+.cap-what-good {
+  background: var(--pos-pale);
+  border: 1px solid var(--pos-bd);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 10px;
+}
+.cap-what-good-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--pos);
+  margin-bottom: 4px;
+}
+.cap-what-good-text { font-size: 12px; color: var(--text2); line-height: 1.5; }
+
+.cap-dependency {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px 12px;
+  background: var(--warn-pale);
+  border: 1px solid var(--warn-bd);
+  border-radius: 8px;
+}
+.cap-dep-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--warn);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.cap-dep-text { font-size: 12px; color: var(--text2); line-height: 1.5; }
+
+/* ── ROADMAP ENRICHED ── */
+.phase-effort-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.phase-pill {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 100px;
+  border: 1px solid var(--border2);
+  color: var(--text3);
+  background: var(--bg2);
+}
+.phase-dep {
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+}
+.phase-dep::before { content: '↳'; color: var(--text4); flex-shrink: 0; }
+
+/* ── 30/60/90 ACTION PLAN ── */
+.action-plan {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+@media(max-width:600px) { .action-plan { grid-template-columns: 1fr; } }
+.action-col {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+.action-col-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.action-timeframe {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 2px;
+}
+.action-theme {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+.action-items { padding: 12px 16px; display: flex; flex-direction: column; gap: 7px; }
+.action-item {
+  font-size: 12px;
+  color: var(--text2);
+  display: flex;
+  gap: 8px;
+  line-height: 1.4;
+}
+.action-item::before {
+  content: '·';
+  color: var(--text4);
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+  margin-top: -1px;
+}
+
+/* ── COMPETITIVE CONTEXT ── */
+.competitive-box {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  margin-bottom: 28px;
+  box-shadow: var(--shadow-xs);
+}
+.comp-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 80px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.comp-row:last-child { border-bottom: none; padding-bottom: 0; }
+.comp-row:first-child { padding-top: 0; }
+.comp-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-reason { font-size: 12px; color: var(--text2); line-height: 1.4; }
+.comp-verdict {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.comp-verdict.primary { background: var(--accent-pale); color: var(--accent); border: 1px solid var(--accent-bd); }
+.comp-verdict.secondary { background: var(--bg2); color: var(--text3); border: 1px solid var(--border2); }
+.comp-verdict.notfit { background: var(--neg-pale); color: var(--neg); border: 1px solid var(--neg-bd); }
+
+/* Utility */
+.mb4 { margin-bottom: 4px; }
+.mt24 { margin-top: 24px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     INTRO
+══════════════════════════════════════ -->
+<div id="screen-intro" class="screen active" style="position:relative;">
+
+  <!-- Full-width top nav — ORION top-left spanning both columns -->
+  <nav class="intro-nav">
+    <div class="intro-nav-brand">
+      <div class="intro-nav-icon">
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="10" cy="10" r="7" stroke="#FAF8F0" stroke-width="1.5"/>
+          <circle cx="10" cy="10" r="3" fill="#BF801E"/>
+          <line x1="10" y1="1" x2="10" y2="4" stroke="#FAF8F0" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="10" y1="16" x2="10" y2="19" stroke="#FAF8F0" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="1" y1="10" x2="4" y2="10" stroke="#FAF8F0" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="16" y1="10" x2="19" y2="10" stroke="#FAF8F0" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="intro-nav-name">Orion<em>.</em></div>
+        <div class="intro-nav-by">EyeOn · Planning Intelligence</div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="intro-split">
+
+    <!-- LEFT: hero product preview -->
+    <div class="intro-hero">
+      <div class="hero-card-stack">
+
+        <!-- Score card -->
+        <div class="hero-score-card">
+          <div class="hero-score-label">Assessment Output</div>
+
+          <!-- PMI gauge -->
+          <div class="hero-gauge-wrap">
+            <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+              <circle cx="60" cy="60" r="46" stroke="#EBE8E0" stroke-width="7"/>
+              <circle cx="60" cy="60" r="46" stroke="#175AA6" stroke-width="7"
+                stroke-linecap="round" stroke-dasharray="139 289"
+                transform="rotate(-90 60 60)"/>
+              <text x="60" y="55" text-anchor="middle" font-size="28" font-weight="700"
+                fill="#1C2129" font-family="IBM Plex Mono,monospace" letter-spacing="-1">48</text>
+              <text x="60" y="71" text-anchor="middle" font-size="10"
+                fill="#9EA1AB" font-family="IBM Plex Mono,monospace">/100</text>
+            </svg>
+          </div>
+
+          <!-- Stage badge -->
+          <div class="hero-stage-chip">
+            <span><div class="hero-stage-dot"></div>Stage 2 · Developing</span>
+          </div>
+
+          <!-- Dimension bars -->
+          <div class="hero-dim-bars">
+            <div class="hero-dim-row">
+              <div class="hero-dim-dot" style="background:#C8733A"></div>
+              <div class="hero-dim-track"><div class="hero-dim-fill" style="width:31%;background:#C8733A"></div></div>
+              <div class="hero-dim-num">31</div>
+            </div>
+            <div class="hero-dim-row">
+              <div class="hero-dim-dot" style="background:#2E8B57"></div>
+              <div class="hero-dim-track"><div class="hero-dim-fill" style="width:55%;background:#2E8B57"></div></div>
+              <div class="hero-dim-num">55</div>
+            </div>
+            <div class="hero-dim-row">
+              <div class="hero-dim-dot" style="background:#175AA6"></div>
+              <div class="hero-dim-track"><div class="hero-dim-fill" style="width:22%;background:#175AA6"></div></div>
+              <div class="hero-dim-num">22</div>
+            </div>
+            <div class="hero-dim-row">
+              <div class="hero-dim-dot" style="background:#1A7F8A"></div>
+              <div class="hero-dim-track"><div class="hero-dim-fill" style="width:62%;background:#1A7F8A"></div></div>
+              <div class="hero-dim-num">62</div>
+            </div>
+            <div class="hero-dim-row">
+              <div class="hero-dim-dot" style="background:#7047A3"></div>
+              <div class="hero-dim-track"><div class="hero-dim-fill" style="width:41%;background:#7047A3"></div></div>
+              <div class="hero-dim-num">41</div>
+            </div>
+          </div>
+
+          <div class="hero-card-rule"></div>
+        </div>
+
+        <!-- Fit verdict chip -->
+        <div class="hero-verdict-chip">
+          <div class="hero-verdict-icon">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <path d="M8 1l1.8 4.8H15L10.5 9l1.7 4.9L8 11.3 3.8 14 5.5 9 1 5.8h5.2z" fill="#BF801E"/>
+            </svg>
+          </div>
+          <div>
+            <div class="hero-verdict-title">Anaplan — Conditional Fit</div>
+            <div class="hero-verdict-sub">3 conditions · roadmap generated</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- RIGHT: content — no wordmark, handled by top nav -->
+    <div class="intro-content">
+      <div class="intro-content-inner">
+
+      <h1 class="intro-headline">
+        Your Anaplan fit,<br><em>precisely measured.</em>
+      </h1>
+      <p class="intro-sub">
+        A structured diagnostic that scores your planning maturity across five dimensions and produces a sourced, specific Anaplan capability roadmap — not generic advice.
+      </p>
+
+      <div class="intro-stats">
+        <div class="intro-stat">
+          <div class="intro-stat-val">~12 min</div>
+          <div class="intro-stat-lbl">To complete</div>
+        </div>
+        <div class="intro-stat">
+          <div class="intro-stat-val">5 Dimensions</div>
+          <div class="intro-stat-lbl">Assessed</div>
+        </div>
+        <div class="intro-stat">
+          <div class="intro-stat-val">Validated</div>
+          <div class="intro-stat-lbl">Using global frameworks</div>
+        </div>
+      </div>
+
+      <button class="btn-cta" onclick="startAssessment()">
+        Begin Assessment
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <p class="intro-foot">
+        Gartner S&amp;OP Model · Anapedia · Oliver Wight IBP Framework
+      </p>
+
+      </div><!-- /.intro-content-inner -->
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ASSESSMENT
+══════════════════════════════════════ -->
+<div id="screen-assess" class="screen">
+  <div class="assess-header">
+    <div class="assess-header-inner">
+      <div class="assess-logo">Orion</div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+      <div class="progress-label" id="progress-label">0 / 0</div>
+    </div>
+  </div>
+  <div class="assess-body">
+    <div id="q-container"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     CALCULATING
+══════════════════════════════════════ -->
+<div id="screen-calc" class="screen">
+  <div class="calc-inner">
+    <div class="calc-ring">
+      <svg viewBox="0 0 64 64" fill="none">
+        <circle cx="32" cy="32" r="26" stroke="#DED9CF" stroke-width="3"/>
+        <circle cx="32" cy="32" r="26" stroke="#175AA6" stroke-width="3"
+          stroke-linecap="round" stroke-dasharray="40 124"
+          transform="rotate(-90 32 32)"/>
+      </svg>
+    </div>
+    <div class="calc-title">Analysing your responses</div>
+    <div class="calc-sub">Generating report</div>
+    <div class="calc-steps" id="calc-steps">
+      <div class="calc-step" id="cs-0">
+        <div class="calc-step-dot"><svg width="8" height="7" viewBox="0 0 8 7" fill="none"><path d="M1 3.5L3 5.5L7 1" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div class="calc-step-text">Scoring demand planning maturity</div>
+      </div>
+      <div class="calc-step" id="cs-1">
+        <div class="calc-step-dot"><svg width="8" height="7" viewBox="0 0 8 7" fill="none"><path d="M1 3.5L3 5.5L7 1" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div class="calc-step-text">Evaluating supply process alignment</div>
+      </div>
+      <div class="calc-step" id="cs-2">
+        <div class="calc-step-dot"><svg width="8" height="7" viewBox="0 0 8 7" fill="none"><path d="M1 3.5L3 5.5L7 1" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div class="calc-step-text">Assessing financial integration depth</div>
+      </div>
+      <div class="calc-step" id="cs-3">
+        <div class="calc-step-dot"><svg width="8" height="7" viewBox="0 0 8 7" fill="none"><path d="M1 3.5L3 5.5L7 1" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div class="calc-step-text">Checking data infrastructure readiness</div>
+      </div>
+      <div class="calc-step" id="cs-4">
+        <div class="calc-step-dot"><svg width="8" height="7" viewBox="0 0 8 7" fill="none"><path d="M1 3.5L3 5.5L7 1" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div class="calc-step-text">Running Anaplan fit algorithm</div>
+      </div>
+      <div class="calc-step" id="cs-5">
+        <div class="calc-step-dot"><svg width="8" height="7" viewBox="0 0 8 7" fill="none"><path d="M1 3.5L3 5.5L7 1" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div class="calc-step-text">Building implementation roadmap</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     REPORT
+══════════════════════════════════════ -->
+<div id="screen-report" class="screen">
+  <div class="report-masthead">
+    <div class="report-mast-inner">
+      <div>
+        <div class="report-eyeon">Orion · EyeOn Planning Intelligence</div>
+        <div class="report-title">Planning Maturity &amp;<br>Anaplan Fit Assessment</div>
+        <div class="report-meta" id="r-meta"></div>
+      </div>
+      <div class="pmi-gauge-wrap">
+        <div class="pmi-gauge" id="pmi-gauge-wrap">
+          <svg class="gauge-svg" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Background track -->
+            <circle cx="60" cy="60" r="48" stroke="rgba(255,255,255,0.1)" stroke-width="6"/>
+            <!-- Score arc — drawn by JS -->
+            <circle id="gauge-arc" cx="60" cy="60" r="48"
+              stroke="#BF801E" stroke-width="6"
+              stroke-linecap="round"
+              stroke-dasharray="0 301.6"
+              transform="rotate(-90 60 60)"
+              style="transition: stroke-dasharray 1.2s cubic-bezier(0.4,0,0.2,1), stroke 0.5s"/>
+          </svg>
+          <div class="pmi-gauge-center">
+            <div class="pmi-gauge-num" id="gauge-num">0</div>
+            <div class="pmi-gauge-denom">/ 100</div>
+          </div>
+        </div>
+        <div class="pmi-gauge-label" id="gauge-label"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="report-body" id="report-content"></div>
+
+  <!-- Action bar — above the dark footer -->
+  <div class="report-action-bar">
+    <div class="report-action-inner">
+      <button class="btn-action-pdf" id="btn-pdf" onclick="exportPDF()">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 12h10M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Export PDF
+      </button>
+      <button class="btn-action-restart" onclick="restart()">
+        ← New Assessment
+      </button>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    <div class="report-footer-inner">
+      <div>
+        <p><strong>Orion</strong> · Powered by EyeOn Anaplan methodology</p>
+        <p style="margin-top:3px">Assessment version Q1 2026 · All findings sourced to named public frameworks</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="pdf-toast" id="pdf-toast"></div>
+
+<script>
+/* ══════════════════════════════════════════════
+   QUESTION BANK
+══════════════════════════════════════════════ */
+const Q = [
+  // PROFILE
+  {
+    id:'q1', dim:'Company Profile', dimCol:'#9EA1AB', scored:false,
+    text:'What is the primary scope of your planning transformation initiative?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Finance only — budgeting, forecasting, FP&A'},
+      {id:'B',text:'Supply Chain only — demand, supply, inventory planning'},
+      {id:'C',text:'Cross-functional — Supply Chain, Finance, and Sales all in scope'},
+      {id:'D',text:'Not yet defined — still exploring what Anaplan could solve'},
+    ]
+  },
+  {
+    id:'q2', dim:'Company Profile', dimCol:'#9EA1AB', scored:false,
+    text:'How many users would actively plan, input data, or review outputs in a new planning environment?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Fewer than 15 users'},
+      {id:'B',text:'15 to 50 users'},
+      {id:'C',text:'50 to 150 users'},
+      {id:'D',text:'More than 150 users'},
+    ]
+  },
+  // DEMAND
+  {
+    id:'q3', dim:'Demand Process', dimCol:'#C8733A', scored:true,
+    text:'How is your current demand forecast generated?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Primarily Excel — teams fill in numbers each planning cycle',score:1},
+      {id:'B',text:'A planning tool generates a statistical baseline which planners adjust',score:2},
+      {id:'C',text:'A structured consensus process combines statistical baseline with commercial input',score:3},
+      {id:'D',text:'ML/AI-driven forecast with exception-based planner review and override tracking',score:4},
+    ],
+    branch:{ifAnswer:'A',nextId:'q3b'}
+  },
+  {
+    id:'q3b', dim:'Demand Process', dimCol:'#C8733A', scored:true, isBranch:true,
+    text:'How much structured historical sales data do you have available in one system?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Less than 12 months',score:1},
+      {id:'B',text:'12 to 24 months in one system',score:2},
+      {id:'C',text:'More than 24 months across multiple systems or formats',score:2},
+      {id:'D',text:'More than 24 months, clean and in one system',score:3},
+    ]
+  },
+  {
+    id:'q4', dim:'Demand Process', dimCol:'#C8733A', scored:true,
+    text:'How do Sales, Marketing, and Operations contribute to the demand plan?',
+    type:'single',
+    opts:[
+      {id:'A',text:'They do not — one function owns the forecast without formal cross-functional input',score:1},
+      {id:'B',text:'Inputs collected via email or manual consolidation before S&OP meetings',score:2},
+      {id:'C',text:'Structured review step exists but no shared system — alignment is meeting-based',score:3},
+      {id:'D',text:'All functions contribute via a shared platform with tracked overrides and accountability',score:4},
+    ]
+  },
+  {
+    id:'q5', dim:'Demand Process', dimCol:'#C8733A', scored:true,
+    text:'How does your organisation measure and act on forecast accuracy?',
+    type:'single',
+    opts:[
+      {id:'A',text:'We do not systematically track forecast accuracy',score:1},
+      {id:'B',text:'We track it informally — occasional comparisons of forecast vs actual',score:2},
+      {id:'C',text:'MAPE or similar metric tracked monthly, reviewed in S&OP meetings',score:3},
+      {id:'D',text:'Forecast accuracy tracked by SKU or segment with automated exception flagging',score:4},
+    ]
+  },
+  // SUPPLY
+  {
+    id:'q6', dim:'Supply Process', dimCol:'#2E8B57', scored:true,
+    text:'How are production or operational capacity constraints factored into your planning process?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Not factored in — demand plan sent to operations and constraints surface reactively',score:1},
+      {id:'B',text:'Capacity checked manually after the demand plan is finalised',score:2},
+      {id:'C',text:'Capacity and demand are balanced in the same tool or formal process step',score:3},
+      {id:'D',text:'Constrained planning is automated — system identifies and resolves demand vs capacity gaps',score:4},
+    ]
+  },
+  {
+    id:'q7', dim:'Supply Process', dimCol:'#2E8B57', scored:true,
+    text:'How does your organisation respond to supply disruptions such as supplier delays, shortages, or production issues?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Reactively — disruptions escalated and resolved ad hoc when they occur',score:1},
+      {id:'B',text:'Contingency protocols exist but scenario planning is done manually in Excel',score:2},
+      {id:'C',text:'Alternative scenarios are modelled in a planning tool before disruptions occur',score:3},
+      {id:'D',text:'Scenario modelling embedded in the planning cycle with pre-approved response playbooks',score:4},
+    ]
+  },
+  {
+    id:'q8', dim:'Supply Process', dimCol:'#2E8B57', scored:true,
+    text:'What is your primary operational planning horizon?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Less than 4 weeks — we plan in execution mode, reacting to immediate requirements',score:1},
+      {id:'B',text:'1 to 3 months, short to medium-term horizon',score:2},
+      {id:'C',text:'3 to 12 months rolling, with regular refresh',score:3},
+      {id:'D',text:'12 or more months with rolling updates connecting to strategic plan',score:4},
+    ]
+  },
+  // FINANCE
+  {
+    id:'q9', dim:'Financial Integration', dimCol:'#175AA6', scored:true,
+    text:'How connected is your operational or volume plan to your financial forecast?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Separate processes — Finance builds their own forecast independently of operations',score:1},
+      {id:'B',text:'Manual reconciliation at month-end or quarter-end',score:2},
+      {id:'C',text:'Volume plan translated to financials but requires days of manual work',score:3},
+      {id:'D',text:'Any change to the operational plan flows through to the management P&L in near real-time',score:4},
+    ],
+    branch:{ifAnswer:['A','B'],nextId:'q9b'}
+  },
+  {
+    id:'q9b', dim:'Financial Integration', dimCol:'#175AA6', scored:false, isBranch:true,
+    text:'What is the primary reason Finance is not yet connected to the operational plan?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Finance and Operations have different planning cycles that do not align'},
+      {id:'B',text:'We lack a shared platform — Finance uses entirely different tools'},
+      {id:'C',text:'There is limited appetite in Finance to connect to operational planning'},
+      {id:'D',text:'It is on our roadmap but not yet implemented'},
+    ]
+  },
+  {
+    id:'q10', dim:'Financial Integration', dimCol:'#175AA6', scored:true,
+    text:'In your S&OP process, when does Finance engage?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Finance is not part of our S&OP process',score:1},
+      {id:'B',text:'Finance reviews the S&OP output after decisions are made',score:2},
+      {id:'C',text:'Finance attends S&OP meetings to validate financial impact of scenarios',score:3},
+      {id:'D',text:'Finance is an equal contributor — volume and value plans built and reviewed simultaneously',score:4},
+    ]
+  },
+  // DATA
+  {
+    id:'q11', dim:'Data Infrastructure', dimCol:'#1A7F8A', scored:false,
+    text:'What is your primary ERP or transactional source system?',
+    type:'single',
+    opts:[
+      {id:'A',text:'SAP ECC 6.0, on-premise'},
+      {id:'B',text:'SAP S/4HANA, cloud or on-premise'},
+      {id:'C',text:'Oracle ERP, including EBS, Cloud, or Fusion'},
+      {id:'D',text:'Other ERP or no ERP — Infor, Dynamics, file-based, or homegrown'},
+    ],
+    branch:{ifAnswer:'A',nextId:'q11b'}
+  },
+  {
+    id:'q11b', dim:'Data Infrastructure', dimCol:'#1A7F8A', scored:false, isBranch:true,
+    text:'How is data currently extracted from SAP ECC for reporting or analysis?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Manual exports — someone runs reports and downloads files each cycle'},
+      {id:'B',text:'Automated file extracts to shared drive or SFTP on a schedule'},
+      {id:'C',text:'Via a middleware or ETL tool such as MuleSoft, Boomi, or Azure Data Factory'},
+      {id:'D',text:'A data warehouse sits between SAP and our planning tools'},
+    ]
+  },
+  {
+    id:'q12', dim:'Data Infrastructure', dimCol:'#1A7F8A', scored:true,
+    text:'How would you describe the quality of your master data — product, customer, and supplier?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Significant issues — duplicates, inactive records, inconsistent hierarchies across systems',score:1},
+      {id:'B',text:'Partially clean — some domains are good, others have known quality gaps',score:2},
+      {id:'C',text:'Mostly clean — regular data governance in place, issues addressed reactively',score:3},
+      {id:'D',text:'Well governed — master data ownership defined, quality measured, proactively managed',score:4},
+    ]
+  },
+  {
+    id:'q13', dim:'Data Infrastructure', dimCol:'#1A7F8A', scored:true,
+    text:'What technology does your team primarily use for planning and forecasting today?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Microsoft Excel or Google Sheets — planning lives in spreadsheets',score:1},
+      {id:'B',text:'ERP-native planning module such as SAP PP or Oracle Planning',score:2},
+      {id:'C',text:'A dedicated planning tool, legacy or current generation',score:3},
+      {id:'D',text:'An integrated planning platform already connecting multiple functions',score:4},
+    ]
+  },
+  // GOVERNANCE
+  {
+    id:'q14', dim:'Governance & People', dimCol:'#7047A3', scored:true,
+    text:'Do you have internal resources who could own and maintain a planning model after implementation?',
+    type:'single',
+    opts:[
+      {id:'A',text:'No — we would rely entirely on an external partner for all model changes',score:1},
+      {id:'B',text:'One person who could be trained, but currently no planning tool experience',score:2},
+      {id:'C',text:'A small team of 2 to 3 people with analytical background who could be developed',score:3},
+      {id:'D',text:'An established internal capability or Centre of Excellence already in place',score:4},
+    ]
+  },
+  {
+    id:'q15', dim:'Governance & People', dimCol:'#7047A3', scored:true,
+    text:'How structured and governed is your current planning process?',
+    type:'single',
+    opts:[
+      {id:'A',text:'Informal — planning happens reactively in meetings and email threads',score:1},
+      {id:'B',text:'Partially structured — some regular meetings but no formal documentation or ownership',score:2},
+      {id:'C',text:'Documented process — defined cadence and roles, but not consistently followed',score:3},
+      {id:'D',text:'Governed process — documented, owned, measured, and continuously improved',score:4},
+    ]
+  },
+];
+
+const Q_BY_ID = {};
+Q.forEach(q => Q_BY_ID[q.id] = q);
+
+const DIMS = {
+  'Demand Process':        {weight:0.25, col:'#C8733A', ids:['q3','q3b','q4','q5']},
+  'Supply Process':        {weight:0.20, col:'#2E8B57', ids:['q6','q7','q8']},
+  'Financial Integration': {weight:0.20, col:'#175AA6', ids:['q9','q10']},
+  'Data Infrastructure':   {weight:0.20, col:'#1A7F8A', ids:['q12','q13']},
+  'Governance & People':   {weight:0.15, col:'#7047A3', ids:['q14','q15']},
+};
+
+/* ══════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════ */
+let answers = {};
+let sequence = [];
+let currentIdx = 0;
+
+function getSequence() {
+  const s = ['q1','q2','q3'];
+  if (answers['q3'] === 'A') s.push('q3b');
+  s.push('q4','q5','q6','q7','q8','q9');
+  const a9 = answers['q9'];
+  if (a9 === 'A' || a9 === 'B') s.push('q9b');
+  s.push('q10','q11');
+  if (answers['q11'] === 'A') s.push('q11b');
+  s.push('q12','q13','q14','q15');
+  return s;
+}
+
+/* ══════════════════════════════════════════════
+   RENDER QUESTION
+══════════════════════════════════════════════ */
+function startAssessment() {
+  answers = {}; currentIdx = 0;
+  showScreen('assess');
+  renderQ();
+}
+
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+}
+
+function renderQ() {
+  sequence = getSequence();
+  const total = sequence.length;
+  const pct = Math.round((currentIdx / total) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = (currentIdx + 1) + ' / ' + total;
+
+  const qid = sequence[currentIdx];
+  const q = Q_BY_ID[qid];
+  const sel = answers[qid] || null;
+
+  // Dim pill styles
+  const dimBg = q.dimCol + '18';
+  const dimBorder = q.dimCol + '45';
+
+  const pillHtml = `<div class="q-dim-pill" style="background:${dimBg};border-color:${dimBorder};color:${q.dimCol}">
+    <div class="q-dim-dot" style="background:${q.dimCol}"></div>${q.dim}
+  </div>`;
+
+  const branchHtml = q.isBranch
+    ? '<div class="branch-pill">&#8618; Follow-up</div>'
+    : '';
+
+  const optsHtml = q.opts.map(o => {
+    const isSel = sel === o.id;
+    return `<button class="opt${isSel ? ' selected' : ''}" onclick="selectOpt('${qid}','${o.id}',this)">
+      <div class="opt-indicator">
+        <svg width="8" height="7" viewBox="0 0 8 7" fill="none">
+          <path d="M1 3.5L3 5.5L7 1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <span class="opt-label">${o.id}</span>
+      <span class="opt-text">${o.text}</span>
+    </button>`;
+  }).join('');
+
+  const canNext = !!sel;
+  const isLast = currentIdx === total - 1;
+
+  const backBtn = currentIdx > 0
+    ? '<button class="btn-back" onclick="prevQ()">&#8592; Back</button>'
+    : '';
+
+  const container = document.getElementById('q-container');
+  container.innerHTML = `<div class="q-wrap">
+    ${branchHtml}
+    ${pillHtml}
+    <div class="q-counter">Question ${currentIdx + 1} of ${total}</div>
+    <div class="q-text">${q.text}</div>
+    <div class="options">${optsHtml}</div>
+    <div class="q-nav">
+      ${backBtn}
+      <button class="btn-next" id="btn-next" ${canNext ? '' : 'disabled'} onclick="nextQ()">
+        ${isLast ? 'Generate Report' : 'Continue'}
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>`;
+}
+
+function selectOpt(qid, optId, btn) {
+  answers[qid] = optId;
+  btn.closest('.options').querySelectorAll('.opt').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('btn-next').disabled = false;
+}
+
+function nextQ() {
+  sequence = getSequence();
+  if (currentIdx < sequence.length - 1) {
+    const wrap = document.getElementById('q-container').querySelector('.q-wrap');
+    if (wrap) wrap.classList.add('leaving');
+    setTimeout(() => { currentIdx++; renderQ(); }, 210);
+  } else {
+    runCalc();
+  }
+}
+
+function prevQ() {
+  if (currentIdx > 0) {
+    const wrap = document.getElementById('q-container').querySelector('.q-wrap');
+    if (wrap) wrap.classList.add('leaving');
+    setTimeout(() => { currentIdx--; sequence = getSequence(); renderQ(); }, 210);
+  }
+}
+
+/* ══════════════════════════════════════════════
+   CALCULATION
+══════════════════════════════════════════════ */
+function runCalc() {
+  showScreen('calc');
+  const steps = ['cs-0','cs-1','cs-2','cs-3','cs-4','cs-5'];
+  let i = 0;
+  const iv = setInterval(() => {
+    if (i > 0) {
+      document.getElementById(steps[i-1]).classList.remove('active');
+      document.getElementById(steps[i-1]).classList.add('done');
+    }
+    if (i < steps.length) {
+      document.getElementById(steps[i]).classList.add('active');
+      i++;
+    } else {
+      clearInterval(iv);
+      setTimeout(() => buildReport(), 500);
+    }
+  }, 600);
+}
+
+/* ══════════════════════════════════════════════
+   SCORING ENGINE
+══════════════════════════════════════════════ */
+function getDimScore(dimKey) {
+  const cfg = DIMS[dimKey];
+  let total = 0, count = 0;
+  cfg.ids.forEach(id => {
+    const q = Q_BY_ID[id];
+    if (!q.scored) return;
+    if (!sequence.includes(id)) return;
+    const ans = answers[id];
+    if (!ans) return;
+    const opt = q.opts.find(o => o.id === ans);
+    if (opt && opt.score) { total += opt.score; count++; }
+  });
+  if (count === 0) return null;
+  return Math.round(((total / count) - 1) / 3 * 100);
+}
+
+function getPMI() {
+  let ws = 0, tw = 0;
+  Object.entries(DIMS).forEach(([k, cfg]) => {
+    const s = getDimScore(k);
+    if (s === null) return;
+    ws += s * cfg.weight; tw += cfg.weight;
+  });
+  return tw === 0 ? 0 : Math.round(ws / tw);
+}
+
+function getBand(pmi) {
+  if (pmi <= 25) return {id:'s1', label:'Stage 1 · Reactive', badgeBg:'#B82E2E', badgeCol:'#fff',
+    desc:'Planning is informal and spreadsheet-driven. No shared S&OP process. Decisions are reactive and siloed across functions.',
+    ref:'Gartner S&OP Maturity Stage 1 — React'};
+  if (pmi <= 45) return {id:'s2', label:'Stage 2 · Developing', badgeBg:'#BF801E', badgeCol:'#fff',
+    desc:'A structured supply-centric S&OP process exists but Finance and commercial functions are not yet integrated. Heavy reliance on manual consolidation.',
+    ref:'Gartner S&OP Maturity Stage 2 — Anticipate'};
+  if (pmi <= 65) return {id:'s3', label:'Stage 3 · Connected', badgeBg:'#175AA6', badgeCol:'#fff',
+    desc:'Standard and repeatable cross-functional planning process. Demand plans drive supply decisions. Statistical tools in use but Finance integration remains incomplete.',
+    ref:'Gartner S&OP Maturity Stage 3 — Integrate'};
+  if (pmi <= 82) return {id:'s4', label:'Stage 4 · Optimising', badgeBg:'#217348', badgeCol:'#fff',
+    desc:'Financial and operational plans are connected in near real-time. Executive-level engagement in scenario-based decision making. Algorithmic tools deployed for forecasting.',
+    ref:'Gartner S&OP Maturity Stage 4 — Collaborate'};
+  return {id:'s5', label:'Stage 5 · Orchestrating', badgeBg:'#217348', badgeCol:'#fff',
+    desc:'Predictive, demand-shaping planning with automated decision support. Plans continuously updated rather than periodically refreshed.',
+    ref:'Gartner S&OP Maturity Stage 5 — Orchestrate'};
+}
+
+function getCriticalBlockers() {
+  const b = [];
+  if (answers['q12'] === 'A') {
+    b.push({type:'hard', title:'Master Data Quality — Critical Blocker',
+      body:'Assessment responses indicate significant master data quality issues including duplicates, inactive records, and inconsistent hierarchies. Per The Anaplan Way, a clean product and customer master is a mandatory prerequisite before any Data Hub or planning model can be built. Remediation is Phase 0, not a parallel workstream.',
+      source:'The Anaplan Way (Anaplan public implementation methodology) · Anaplan Community go-live risk documentation'});
+  }
+  if (answers['q15'] === 'A' && answers['q14'] === 'A') {
+    b.push({type:'hard', title:'No Process Foundation + No Internal Capability',
+      body:'The combination of an informal planning process and no internal Anaplan capability significantly increases implementation failure risk. Per BARC Planning Survey 2025, these are the two most cited causes of stalled or failed Anaplan programmes. Both must be explicitly addressed in the project plan before any model build begins.',
+      source:'BARC Planning Survey 2025 · Edwards Lifesciences COE case study (B EYE, 2025, public)'});
+  }
+  return b;
+}
+
+function getFlags() {
+  const f = [];
+  if (answers['q11'] === 'A') {
+    const ex = answers['q11b'];
+    if (ex === 'A' || ex === 'B') {
+      f.push({type:'soft', title:'SAP ECC Integration — Middleware Budget Required',
+        body:'Anaplan CloudWorks supports cloud file store connections including AWS S3, Azure Blob, and SFTP, but does not connect directly to SAP ECC 6.0. A middleware layer such as MuleSoft, Boomi, or Azure Integration Services is required. This is a real budget item frequently absent from initial Anaplan licence quotes. Ensure it is in your business case before contract signature.',
+        source:'Anapedia — CloudWorks supported connections (Anaplan public documentation)'});
+    } else if (ex === 'C' || ex === 'D') {
+      f.push({type:'info', title:'SAP ECC Integration — Existing Middleware Detected',
+        body:'Your existing ETL or middleware tool reduces integration complexity significantly. CloudWorks can pick up from the file store or data warehouse output. Validate that the tool can be extended to extract the specific data sets required for Anaplan — actuals, master data, and open orders.',
+        source:'Anapedia — CloudWorks integration patterns (Anaplan public documentation)'});
+    }
+  }
+  if (answers['q9b'] === 'C') {
+    f.push({type:'soft', title:'Finance Appetite — Change Management Recommended',
+      body:'Assessment indicates limited Finance appetite for connected planning. Supply chain-led Anaplan programmes with separate budget pools frequently succeed without Finance buy-in at initiation, with Finance engagement increasing organically once operational planning value is demonstrated. A phased approach is viable. However, executive sponsorship for the eventual Finance connection should be secured early.',
+      source:'The Anaplan Way — phased value demonstration · Anaplan Community COE expansion patterns'});
+  }
+  if (answers['q14'] === 'A' || answers['q14'] === 'B') {
+    f.push({type:'soft', title:'Internal Anaplan Capability — COE Build Programme Required',
+      body:'Per BARC Planning Survey 2025, scaling Anaplan past a couple of small use cases is impossible without an internal Centre of Excellence. A minimum viable COE — one certified Model Builder and one planning domain business architect — must be in place by the end of Phase 2. This is a total cost of ownership item, not an optional investment.',
+      source:'BARC Planning Survey 2025 · Edwards Lifesciences COE case study (B EYE, 2025, public)'});
+  }
+  if (answers['q2'] === 'A') {
+    f.push({type:'info', title:'User Population — Commercial Sizing Consideration',
+      body:'Fewer than 15 planning users. Per BARC Planning Survey 2025, enterprise platform benefits are most pronounced at higher user volumes. A cost-benefit assessment should be completed alongside any licence negotiation to confirm the ROI case is robust at this scale.',
+      source:'BARC Planning Survey 2025 — enterprise platform value and cost considerations'});
+  }
+  if (answers['q3b'] === 'A') {
+    f.push({type:'soft', title:'Historical Data — PlanIQ Not Viable in Phase 1',
+      body:'Anapedia documents that PlanIQ requires a minimum of 12 months of historical data for ETS and ARIMA algorithms, and 300 or more data points across 75 percent of the historical timeline for DeepAR+. With less than 12 months available, a statistical baseline is not yet viable. Phase 1 demand planning should use a manual consensus baseline. PlanIQ should be scheduled for Phase 2 once sufficient history has accumulated.',
+      source:'Anapedia — PlanIQ forecast horizon calculations (Anaplan public documentation)'});
+  }
+  return f;
+}
+
+function getToolFit(blockers, flags) {
+  const hard = blockers.filter(b => b.type === 'hard');
+  const pmi = getPMI();
+  if (hard.length > 0 || pmi < 20) return {
+    verdict:'notready', icon:'&#9747;',
+    title:'Anaplan — Address These Conditions First',
+    body:'The assessment has identified conditions that will significantly limit Anaplan\'s ability to deliver value at this point in time. This is a timing verdict, not a permanent one. Each condition is named with a resolution path. Anaplan is the appropriate long-term platform direction.'
+  };
+  const soft = flags.filter(f => f.type === 'soft').length;
+  if (soft >= 2 || pmi < 35) return {
+    verdict:'conditional', icon:'&#9889;',
+    title:'Anaplan — Recommended with Conditions',
+    body:'Anaplan is the right platform direction for your planning transformation. The assessment has identified specific conditions that must be addressed during — or in some cases before — implementation to avoid the failure patterns documented in BARC Planning Survey 2025. Each condition is named below with a resolution path.'
+  };
+  return {
+    verdict:'strong', icon:'&#10003;',
+    title:'Anaplan — Strong Fit',
+    body:'The assessment indicates strong alignment between your planning context and Anaplan\'s connected planning architecture. Process foundations, data infrastructure, and internal capability readiness are at a level where an implementation is expected to deliver value within a standard timeline.'
+  };
+}
+
+function getCapabilities() {
+  const caps = [];
+  const ds = {};
+  Object.keys(DIMS).forEach(k => { const s = getDimScore(k); if (s !== null) ds[k] = s; });
+
+  const dem = ds['Demand Process'] ?? 0;
+  const sup = ds['Supply Process'] ?? 0;
+  const fin = ds['Financial Integration'] ?? 0;
+  const dat = ds['Data Infrastructure'] ?? 0;
+  const gov = ds['Governance & People'] ?? 0;
+
+  // Data hub first
+  if (dat < 67) {
+    caps.push({phase:'pre', tag:'Prerequisite',
+      name:'Anaplan Data Hub — Master Data & Actuals Foundation',
+      body:'Per The Anaplan Way and Anapedia hub-and-spoke architecture documentation, a Data Hub holding clean master data and historical actuals is a mandatory prerequisite before any planning spoke model is built. The hub is the single source of truth. No spoke model — demand planning, supply, or FP&A — should be deployed until the Data Hub is live and validated. This is not a suggestion — it is the architectural dependency that governs every other recommendation in this report.',
+      detail: answers['q11'] === 'A'
+        ? 'Integration path: SAP ECC extraction via middleware to cloud file store, then Anaplan CloudWorks trigger to Data Hub import actions. Recommended load frequency: nightly for actuals, weekly for master data. Master data updates weekly or on change event.'
+        : 'CloudWorks connects natively to cloud file stores including AWS S3, Azure Blob, and SFTP for scheduled loads. Validate that your ERP extraction produces the five required data sets: sales actuals, production actuals, product master with hierarchy, customer master, and open order book.',
+      goodLooks: 'The Data Hub is live and running automated nightly loads consistently for two weeks with zero import failures. Product master is clean with no duplicates. Twenty-four or more months of actuals are loaded and validated against ERP source. Spoke model development has not started.',
+      dependency: answers['q11'] === 'A' ? 'Middleware tool selected and procurement initiated. Master data quality assessment complete with remediation plan signed off by data owner.' : 'ERP extraction producing all five required data sets validated in staging environment before CloudWorks schedule is activated.',
+      source:'The Anaplan Way (Anaplan public methodology) · Anapedia — hub-and-spoke architecture'});
+  }
+
+  // Demand
+  if (dem < 34) {
+    caps.push({phase:'p1', tag:'Phase 1',
+      name:'Anaplan Consensus Demand Planning Application',
+      body:'The Consensus Demand Planning application provides a structured workflow for cross-functional input, commercial override, and consensus sign-off — the foundational demand planning capability for organisations at Gartner Stage 1 to 2. At this maturity level, the priority is establishing a governed, repeatable consensus process before introducing statistical baseline generation. The application enforces the structure the process currently lacks.',
+      detail: answers['q3b'] === 'A'
+        ? 'PlanIQ statistical baseline is not recommended in Phase 1 due to insufficient historical data per Anapedia PlanIQ prerequisites. A manual consensus baseline with structured commercial input is the appropriate starting point. Schedule PlanIQ for Phase 1b once 12 months of actuals have accumulated in the Data Hub.'
+        : 'Once the Data Hub is stable and 12 or more months of actuals are loaded, PlanIQ ETS or ARIMA statistical baseline should be configured as a Phase 1b enhancement. AutoML is the recommended starting configuration — it selects the best-fit algorithm per item automatically.',
+      goodLooks: 'Monthly consensus cycle running on a defined cadence. Commercial overrides are tracked and the rationale recorded. MAPE is calculated each period and reviewed in S&OP. Planning team can identify the top 10 most inaccurate items and is actively working to improve them.',
+      dependency: 'Data Hub live and validated with clean product master and actuals. Demand planning process cadence agreed and communicated to all contributing functions before application build begins.',
+      source:'Anaplan App Hub — Consensus Demand Planning Application · Gartner S&OP Stage 1 to 2'});
+  } else if (dem < 67) {
+    caps.push({phase:'p1', tag:'Phase 1',
+      name:'Consensus Demand Planning + PlanIQ Statistical Baseline',
+      body:'Per Anapedia PlanIQ documentation, the platform supports ETS for stable seasonal patterns with 12 to 24 months of history, and DeepAR+ for organisations with 24 or more months and sufficient data density. Combining a statistical baseline with a structured consensus workflow is the defining process characteristic of Gartner Stage 3 — Integrate. The statistical baseline removes the anchor bias inherent in purely commercial-led forecasting.',
+      detail: answers['q3b'] === 'D'
+        ? 'With 24 or more months of clean historical data, DeepAR+ is the recommended starting algorithm. Per Anapedia, DeepAR+ requires a minimum of 300 data points across 75 percent of the historical timeline. If this threshold is not met for all items, configure Anaplan AutoML which will select the best available algorithm per item automatically.'
+        : 'ETS or Anaplan AutoML are the appropriate starting algorithms for your data history profile. Configure MAPE tracking by product segment from sprint 1 — this is documented in Anapedia PlanIQ metrics and is the mechanism by which accuracy improves over time. Do not defer this to Phase 2.',
+      goodLooks: 'PlanIQ generates a statistical baseline automatically at the start of each consensus cycle. Planners review exceptions — items where the commercial override diverges significantly from the statistical baseline — rather than reviewing every item. MAPE by category is tracked as a KPI on the planning dashboard.',
+      dependency: 'Data Hub loaded with minimum 12 months of actuals at product-location level. PlanIQ service enabled on the workspace — confirm with Anaplan account team before model design begins.',
+      source:'Anapedia — PlanIQ algorithms and forecast horizon calculations · Gartner S&OP Stage 3'});
+  } else {
+    caps.push({phase:'p1', tag:'Phase 1 / Enhance',
+      name:'PlanIQ Advanced Configuration + Demand Planning AI Agent',
+      body:'Per the Anaplan Intelligence suite announcement in 2025, the Demand Planning AI Agent provides exception-based review, automated anomaly detection, and consensus facilitation for organisations at Gartner Stage 3 to 4. At this maturity level the focus shifts from building the baseline to optimising override governance and improving MAPE by item segment. The AI Agent surfaces the items that need human attention; the planner adds judgement.',
+      detail:'MAPE tracking by SKU or segment should be a standard output of the planning process per Anapedia PlanIQ accuracy metrics documentation. Override analysis comparing PlanIQ base versus planner final versus actual is the primary continuous improvement mechanism at this maturity stage. Configure bias metrics alongside MAPE — systematic over or under-forecasting by category is a common pattern not visible in MAPE alone.',
+      goodLooks: 'Exception-based workflow is standard practice — planners review fewer than 20 percent of items each cycle, focusing on high-impact exceptions surfaced by the AI Agent. MAPE is improving quarter on quarter. Override accuracy is tracked and feeding back into algorithm calibration.',
+      dependency: 'Anaplan Intelligence suite access confirmed. AI Agent configuration requires Anaplan professional services engagement — not self-serviceable in Phase 1.',
+      source:'Anaplan Intelligence suite (Anaplan, 2025) · Anapedia — PlanIQ accuracy metrics'});
+  }
+
+  // Supply
+  if (sup < 34) {
+    caps.push({phase:'p2', tag:'Phase 2',
+      name:'Anaplan S&OP Application — Supply-Demand Balancing',
+      body:'The Anaplan S&OP Application connects the demand plan to supply constraints and provides scenario comparison for monthly executive review. Per Gartner Stage 2, the priority is developing a capacitated supply plan — transitioning from reactive capacity management to proactive balancing. This is a Phase 2 recommendation, sequenced after demand planning stability is established.',
+      detail:'The S&OP application should be scoped at Product Family level by Plant and Month for initial deployment. SKU-level capacity planning in Anaplan adds model complexity without proportional planning value at Stage 2 maturity — per The Anaplan Way principle of minimum viable planning level.',
+      source:'Anaplan S&OP Application documentation · Gartner S&OP Stage 2 — Anticipate · The Anaplan Way'});
+  } else if (sup < 67) {
+    caps.push({phase:'p2', tag:'Phase 2',
+      name:'S&OP Application + Scenario Planning',
+      body:'Anaplan supports multiple concurrent scenario versions with side-by-side comparison, enabling the proactive disruption response that Gartner Stage 3 defines as an Integrate-stage characteristic. At this maturity band, the process foundation for scenario planning exists. The barrier is tooling, not process capability.',
+      detail:'Configure a minimum of three scenario versions: Base Plan, Upside, and Downside. Scenario comparison should be available in the executive S&OP dashboard as a standard output of the monthly cycle. Per Anaplan S&OP documentation, version management is native to the platform model architecture.',
+      source:'Anaplan S&OP Application and scenario modelling documentation · Gartner S&OP Stage 3'});
+  } else {
+    caps.push({phase:'p2', tag:'Phase 2 / Advance',
+      name:'Anaplan Optimizer — Constrained Supply Planning',
+      body:'Per Anapedia Optimizer documentation, Anaplan applies linear programming to solve constrained planning problems — maximising or minimising an objective function subject to capacity, budget, and material constraints. This is appropriate for organisations at Gartner Stage 4 who require automated gap resolution rather than manual scenario selection.',
+      detail:'Optimizer implementation requires a dedicated architecture sprint: OPT_Variables, OPT_Constraints, and OPT_Objective modules must be designed before any formula work begins. This is not suitable for Phase 1 and should be sequenced after the standard S&OP application is stable.',
+      source:'Anapedia — Anaplan Optimizer (linear programming) · Anaplan Supply Planning Application documentation'});
+  }
+
+  // Finance
+  if (fin < 34) {
+    caps.push({phase:'p2', tag:'Phase 2 to 3',
+      name:'Process Alignment First — Finance Integration Second',
+      body:'As stated in The Anaplan Way: an implementation is about fixing a broken process. At this financial integration score, the primary barrier is organisational. The recommendation is to define a joint Finance-Operations planning calendar and review cadence before any FP&A Anaplan build begins. Technology is a Phase 2 to 3 recommendation.',
+      detail: answers['q9b'] === 'C'
+        ? 'Assessment indicates limited Finance appetite. A supply chain-led implementation proving operational value first is viable — Finance engagement often increases organically once connected planning benefit is visible. Executive sponsorship for eventual Finance connection should be secured early.'
+        : 'Once a joint planning cadence is defined and agreed, the Anaplan connected planning volume-to-value translation architecture is the appropriate next step.',
+      source:'The Anaplan Way (Anaplan public methodology) · Oliver Wight IBP Framework'});
+  } else if (fin < 67) {
+    caps.push({phase:'p2', tag:'Phase 2',
+      name:'Connected Planning — Volume to Value Translation',
+      body:'Anaplan\'s hub-and-spoke architecture enables real-time translation of operational volume plans into management P&L projections without manual reconciliation. This is the defining characteristic of an integrated planning process per the Oliver Wight IBP Framework — where demand, supply, and financial plans are integrated in a single monthly cycle.',
+      detail:'The FP&A bridge module translates volume plan outputs by product, plant, and period into revenue and gross margin using a pricing and cost driver module. This eliminates the manual Excel step that currently delays financial visibility by days or weeks after the supply plan is confirmed.',
+      source:'Anaplan Connected Planning architecture documentation · Oliver Wight IBP Framework (public)'});
+  } else {
+    caps.push({phase:'p2', tag:'Phase 2',
+      name:'Full IBP Architecture — Executive S&OP with Real-Time P&L',
+      body:'Per Gartner Stage 4 Collaborate, volume-based planning supplemented by financial perspective with executives responsible for P&L involved in tradeoff decisions. At this maturity level the Anaplan FP&A application suite covering P&L planning and scenario-based financial review is appropriate as a Phase 2 initiative.',
+      detail:'Anaplan does not replace a statutory financial consolidation system. The FP&A module covers management P&L and S&OP financial review, not legal consolidation. This distinction should be explicit in the solution design document to avoid scope expectations mismatch.',
+      source:'Anaplan FP&A Application documentation · Gartner S&OP Stage 4 — Collaborate'});
+  }
+
+  // Governance
+  if (gov < 67) {
+    caps.push({phase:'par', tag:'Parallel',
+      name: gov < 34
+        ? 'Partner-Led Implementation + Mandatory COE Build Programme'
+        : 'Partner-Led with Internal Co-Build — ALM Handover at Phase 2',
+      body: gov < 34
+        ? 'Per BARC Planning Survey 2025, scaling Anaplan past a couple of small use cases is impossible without an internal COE. Per the Edwards Lifesciences case study, the three primary COE failure modes — low adoption, fragmented ownership, and technical debt — all stem from insufficient internal capability investment during implementation. A COE build programme must run from sprint 1.'
+        : 'Per The Anaplan Way, the recommended model is partner-led delivery with active internal co-build. Internal team members should participate in sprint delivery and own model maintenance by Phase 2 completion. Anaplan ALM documented in Anapedia provides the revision tag and model sync structure for a structured handover.',
+      detail: gov < 34
+        ? 'Minimum viable COE target: one certified Anaplan Model Builder and one planning domain business architect in-house by end of Phase 2. The Anaplan Way recommends at least two people at the client achieve Official Anaplanner status during the implementation programme.'
+        : 'Identify the internal Model Builder before sprint 1 starts. Their participation in sprint delivery — not just UAT — is the skills transfer mechanism. External partner role shifts from primary developer to reviewer and architect from Phase 2 onwards.',
+      source:'BARC Planning Survey 2025 · Edwards Lifesciences COE case study (B EYE, 2025) · The Anaplan Way'});
+  }
+
+  return caps;
+}
+
+function getRoadmap(blockers) {
+  const phases = [];
+  if (blockers.filter(b => b.type === 'hard').length > 0) {
+    phases.push({col:'#B82E2E', num:'0',
+      title:'Resolve Critical Prerequisites',
+      meta:'Before implementation begins — no phase 1 until complete',
+      items: blockers.filter(b => b.type === 'hard').map(b => b.title),
+      pills:['Not time-boxed','Client-led'],
+      dependsOn: null});
+  }
+  phases.push({col:'#175AA6', num:'1',
+    title:'Data Foundation + Demand Planning',
+    meta:'Recommended first release · 14 to 18 weeks · Partner-led',
+    items:[
+      'Anaplan Data Hub build — ERP integration, master data, 24+ months actuals',
+      'Master data cleanse workstream — client-led, minimum 4 to 6 weeks, parallel to sprint design',
+      'Consensus Demand Planning application with cross-functional workflow',
+      'PlanIQ statistical baseline configured once data history is confirmed',
+      'COE build programme initiated — internal Model Builder onboarded to sprint delivery',
+      'Two full planning cycles run and validated — MAPE baseline established'
+    ],
+    pills:['14\u201318 weeks','Partner-led','COE build starts'],
+    dependsOn: blockers.filter(b=>b.type==='hard').length > 0 ? 'Phase 0 critical prerequisites resolved before sprint 1' : 'Integration architecture scoped and budgeted before sprint 1'});
+  phases.push({col:'#2E8B57', num:'2',
+    title:'S&OP + Supply-Demand Balancing',
+    meta:'Recommended second release · 10 to 14 weeks · Hybrid delivery',
+    items:[
+      'S&OP application connecting live demand plan to supply capacity constraints',
+      'Multi-plant capacity model scoped at Product Family \u00D7 Plant \u00D7 Month level',
+      'Executive S&OP dashboard — single view of demand, supply, and scenario comparison',
+      'Scenario planning configured: Base, Upside, and Downside versions per monthly cycle',
+      'Internal Model Builder owns at least one module build by end of Phase 2'
+    ],
+    pills:['10\u201314 weeks','Hybrid delivery','Internal co-build'],
+    dependsOn: 'Phase 1 demand planning stable — minimum two full cycles completed and signed off'});
+  phases.push({col:'#7047A3', num:'3',
+    title:'Financial Integration',
+    meta:'Recommended third release · 8 to 12 weeks · Internal-led with governance',
+    items:[
+      'Volume-to-value translation module — operational plan drives management P&L in near real-time',
+      'Pricing and standard cost driver module — product and period granularity agreed with Finance',
+      'Finance participation formalised in monthly S&OP executive review cadence',
+      'Scenario comparison extended to include financial impact per scenario',
+      'COE milestone: internal team owns all model maintenance, partner shifts to advisory only'
+    ],
+    pills:['8\u201312 weeks','Internal-led','COE owns delivery'],
+    dependsOn: 'Finance-Operations planning calendar aligned and joint review cadence agreed before build starts'});
+  return phases;
+}
+
+/* ══════════════════════════════════════════════
+   NARRATIVE GENERATORS
+══════════════════════════════════════════════ */
+function getExecSummary(pmi, band, blockers, flags, fit) {
+  const ds = {};
+  Object.keys(DIMS).forEach(k => { ds[k] = getDimScore(k) ?? 0; });
+
+  const dimScores = Object.entries(ds).sort((a,b) => b[1]-a[1]);
+  const strongest = dimScores[0][0];
+  const weakest = dimScores[dimScores.length-1][0];
+  const scope = {A:'finance planning',B:'supply chain planning',C:'cross-functional connected planning',D:'planning transformation'}[answers['q1']] || 'planning transformation';
+  const hasBlocker = blockers.filter(b => b.type === 'hard').length > 0;
+
+  let p1 = '';
+  if (pmi <= 25) {
+    p1 = `This assessment places your organisation at <strong>Gartner Stage 1 — Reactive</strong>, with a Planning Maturity Index of <em>${pmi}/100</em>. Planning processes are informal and largely spreadsheet-driven, with limited cross-functional coordination and no shared operational platform. This is not an unusual starting point — the majority of manufacturing organisations sit at Stage 1 or 2 when they begin their planning transformation journey. What it does mean is that the sequence of investment matters enormously: the right platform at the wrong maturity stage delivers poor returns.`;
+  } else if (pmi <= 45) {
+    p1 = `This assessment places your organisation at <strong>Gartner Stage 2 — Developing</strong>, with a Planning Maturity Index of <em>${pmi}/100</em>. A supply-centric planning process exists and functions, but it operates largely in isolation from financial planning and commercial functions. Your <em>${strongest}</em> dimension shows the strongest foundation, while <em>${weakest}</em> represents the most significant gap to address before a platform investment will deliver its full potential.`;
+  } else if (pmi <= 65) {
+    p1 = `This assessment places your organisation at <strong>Gartner Stage 3 — Connected</strong>, with a Planning Maturity Index of <em>${pmi}/100</em>. You have established standard and repeatable planning processes with cross-functional input, and statistical tools are in active use. The primary remaining gap is the connection between operational planning and financial management — the defining characteristic of Stage 4 maturity. Your <em>${strongest}</em> dimension provides a strong delivery foundation, while <em>${weakest}</em> requires targeted investment to unlock the full connected planning value case.`;
+  } else {
+    p1 = `This assessment places your organisation at <strong>Gartner Stage 4 — Optimising</strong>, with a Planning Maturity Index of <em>${pmi}/100</em>. Your planning processes are mature, cross-functional, and increasingly data-led. Financial and operational plans are connected or close to it. The opportunity at this maturity level is not foundational capability — it is precision: sharper forecasting algorithms, constrained optimisation, and exception-based workflows that compress the manual effort currently embedded in your monthly cycle.`;
+  }
+
+  let p2 = '';
+  if (hasBlocker) {
+    p2 = `The assessment has identified <strong>critical prerequisites</strong> that must be resolved before any Anaplan implementation begins. These are not project risks to be managed in parallel — they are hard sequencing requirements. Specifically: ${blockers.map(b => b.title.split('—')[0].trim()).join(' and ')}. Proceeding with a platform implementation before resolving these conditions is the most common cause of failed or stalled Anaplan programmes documented in the BARC Planning Survey 2025. The investment timeline should reflect this reality.`;
+  } else if (flags.filter(f => f.type === 'soft').length >= 2) {
+    const softFlags = flags.filter(f => f.type === 'soft');
+    p2 = `The assessment has identified <strong>${softFlags.length} conditional considerations</strong> that will materially affect implementation success if not addressed proactively. These are not blockers — an Anaplan implementation can and should proceed — but each one represents a known failure pattern from documented implementations. The primary risks are: ${softFlags.slice(0,2).map(f => f.title.split('—')[0].trim()).join(' and ')}. The capability roadmap in this report is sequenced specifically to address these in the right order.`;
+  } else {
+    p2 = `The assessment indicates <strong>strong readiness conditions</strong> for an Anaplan implementation. Data infrastructure is at a level where a Data Hub build is feasible, internal capability foundations are present or buildable, and the planning process has sufficient structure to benefit from connected planning tooling. The primary focus of the implementation should be on delivering a high-quality Phase 1 — a stable Data Hub and a governed demand planning process — before expanding scope. Overscoping Phase 1 is the most consistent quality risk in implementations at this maturity level.`;
+  }
+
+  const scopeLabel = scope.charAt(0).toUpperCase() + scope.slice(1);
+  let p3 = '';
+  if (fit.verdict === 'strong') {
+    p3 = `<strong>Anaplan is the recommended platform</strong> for your ${scopeLabel} transformation. The assessment recommends a phased delivery approach: Data Hub and Consensus Demand Planning in Phase 1, S&OP and supply-demand balancing in Phase 2, and financial integration in Phase 3. This sequence is grounded in The Anaplan Way implementation methodology and reflects the architectural dependencies between capabilities. A discovery engagement with EyeOn to validate these findings against your specific ERP landscape and organisational structure is the recommended next step.`;
+  } else if (fit.verdict === 'conditional') {
+    p3 = `<strong>Anaplan is the recommended platform</strong> for your ${scopeLabel} transformation, subject to the conditions identified in this report. The phased delivery approach — Data Hub first, demand planning second, supply and financial integration following — remains appropriate. However, the flagged conditions must be incorporated as explicit workstreams in the project plan, not as risks to be tracked on a register. Each condition has a clear resolution path. A discovery engagement with EyeOn to scope Phase 1 and validate the technical integration architecture is the recommended next step.`;
+  } else {
+    p3 = `<strong>Anaplan is the right long-term direction</strong> for your ${scopeLabel} transformation, but the assessment has identified conditions that make a direct platform implementation premature at this point in time. The recommended path is a structured readiness programme — addressing the critical prerequisites identified in this report — before committing to a platform investment. A readiness engagement with EyeOn, focused specifically on resolving the identified blockers, would give you a clear timeline to implementation readiness.`;
+  }
+
+  return [p1, p2, p3];
+}
+
+function getDimNarrative(dimKey, score) {
+  const narratives = {
+    'Demand Process': {
+      low: {
+        text: 'Demand planning is currently reactive and spreadsheet-driven, with forecasts generated primarily by one function without a structured consensus process. This means the plan reflects the loudest voice in the room rather than the best available signal. The consequence is predictable: persistent over-stock or stock-out cycles, last-minute production schedule changes, and commercial teams working from different numbers than supply chain.',
+        insight: 'The immediate priority is not statistical forecasting — it is establishing a governed consensus process with defined inputs, a clear cadence, and accountability for overrides. Technology cannot substitute for this process foundation.',
+        insightCol: '#C8733A'
+      },
+      mid: {
+        text: 'Demand planning has a structural process in place, with statistical inputs and cross-functional involvement. The gap is consistency and closed-loop performance management: forecast accuracy is tracked occasionally rather than systematically, and override decisions are not routinely evaluated against outcomes. This limits the organisation\'s ability to improve the forecast over time.',
+        insight: 'Configuring MAPE tracking by product segment from day one — not as an afterthought — is the single most impactful demand planning design decision at this maturity level. It makes performance visible and creates accountability for improvement.',
+        insightCol: '#C8733A'
+      },
+      high: {
+        text: 'Demand planning is operating at a mature level with statistical baseline generation, structured consensus, and performance measurement in place. The opportunity at this stage is precision — moving from a monthly cadence with manual exception management to a model that surfaces the right exceptions automatically and compresses the time planners spend on low-value data manipulation.',
+        insight: 'At Stage 3 to 4 demand maturity, the primary improvement lever is exception governance, not algorithm selection. The question is not which algorithm is most accurate — it is which items require human judgement, and how efficiently your process routes them there.',
+        insightCol: '#C8733A'
+      }
+    },
+    'Supply Process': {
+      low: {
+        text: 'Supply planning is operating reactively, with capacity constraints surfacing as execution problems rather than being anticipated in the planning process. There is no formal supply-demand balancing step, and disruption response relies on individual judgement rather than pre-modelled alternatives. Per Gartner Stage 1 characteristics, the organisation is focused on developing a unit-based operational plan rather than a capacitated, scenario-aware supply strategy.',
+        insight: 'Supply planning maturity at this level means Anaplan\'s S&OP application should be Phase 2, not Phase 1. Deploying supply-demand balancing before demand planning is stable produces a constrained plan that constrains the wrong forecast.',
+        insightCol: '#2E8B57'
+      },
+      mid: {
+        text: 'Supply planning has the foundational process structure in place, with capacity considerations increasingly incorporated into planning cycles. The gap is tooling for scenario response: disruption management is still largely reactive because the planning environment does not support fast scenario comparison. Per Gartner Stage 3 criteria, the organisation is beginning to develop the proactive scenario capability that characterises Integrate-stage supply planning.',
+        insight: 'Scenario planning is not a feature that gets configured at go-live and used occasionally. It only delivers value if it is embedded in the monthly S&OP meeting structure — with pre-defined scenarios updated each cycle, not built from scratch when a crisis hits.',
+        insightCol: '#2E8B57'
+      },
+      high: {
+        text: 'Supply planning is operating at a strong maturity level, with capacity planning embedded in the planning cycle and scenario-based response available. The opportunity is moving from scenario selection to constrained optimisation — replacing the human decision of which scenario to execute with an algorithm that finds the optimal allocation across competing constraints.',
+        insight: 'Anaplan Optimizer (linear programming) is the appropriate next capability at this maturity level. However, it requires a dedicated architecture design sprint before any build work begins. OPT module design errors are expensive to correct post-go-live.',
+        insightCol: '#2E8B57'
+      }
+    },
+    'Financial Integration': {
+      low: {
+        text: 'Finance and operational planning are currently separate processes that reconcile infrequently and manually. This means the organisation makes operational decisions and financial decisions from different datasets, often with a lag of weeks between them. Per the Oliver Wight IBP Framework, this represents the most significant structural gap in planning maturity — the inability to see the financial consequence of an operational decision in real time is what separates S&OP from IBP.',
+        insight: 'The barrier here is frequently organisational rather than technical. Before any FP&A Anaplan build is scoped, confirm that Finance and Supply Chain have agreed a joint planning calendar and review cadence. Technology on top of a misaligned process produces an expensive reconciliation tool, not connected planning.',
+        insightCol: '#175AA6'
+      },
+      mid: {
+        text: 'Financial integration exists in principle but requires significant manual effort to execute. Volume plans are translated to financial projections, but the process takes days rather than minutes, which means financial visibility is always slightly stale relative to the operational plan. This is the most common gap at Stage 3 maturity, and it is also the gap that generates the most visible ROI when closed.',
+        insight: 'The volume-to-value translation module in Anaplan eliminates the manual translation step. The design decision that most affects success is the granularity of the pricing and cost driver model — too granular creates maintenance overhead; too aggregated loses the financial precision Finance requires.',
+        insightCol: '#175AA6'
+      },
+      high: {
+        text: 'Financial integration is strong, with operational and financial plans connected and reviewed in the same cycle. The opportunity is moving toward a full IBP architecture — where the Management Business Review per the Oliver Wight framework is supported by real-time scenario comparison showing the P&L consequence of each supply-demand decision, not just the volume impact.',
+        insight: 'At this maturity level, the most valuable Anaplan design investment is the executive S&OP dashboard — a single view that shows volume, supply, and financial outcomes side by side, updated from the live plan. This is the artefact that sustains executive engagement in the S&OP process.',
+        insightCol: '#175AA6'
+      }
+    },
+    'Data Infrastructure': {
+      low: {
+        text: 'Data infrastructure represents the most significant technical prerequisite for any Anaplan implementation. Current conditions — including data quality gaps and integration complexity — mean that a Data Hub build must be the first and primary focus of Phase 1. Per The Anaplan Way and Anapedia hub-and-spoke architecture documentation, no planning spoke model should be deployed until the Data Hub is live, validated, and producing clean, timely data consistently.',
+        insight: 'Data preparation is not a task that can be compressed or parallelised indefinitely. Budget a minimum of 4 to 6 weeks for master data cleanse as a client-led workstream running before implementation sprint 1 starts. This timeline is based on documented implementation patterns, not padding.',
+        insightCol: '#1A7F8A'
+      },
+      mid: {
+        text: 'Data infrastructure provides a workable foundation for an Anaplan implementation, with some known quality gaps that require a managed remediation plan. The integration architecture presents specific decisions depending on your ERP landscape — particularly the CloudWorks connectivity model and whether middleware investment is required. These are resolvable, but they must be scoped accurately in the business case before contract signature.',
+        insight: 'The single most common business case error for Anaplan implementations is underscoping the integration investment. CloudWorks native connectivity works well for cloud file store sources. Direct ERP connections — particularly SAP ECC — require middleware that must be budgeted explicitly.',
+        insightCol: '#1A7F8A'
+      },
+      high: {
+        text: 'Data infrastructure is a genuine strength, providing the foundation for an accelerated Anaplan Data Hub build and reliable downstream planning data. The integration architecture is either already in place or straightforward to establish. This dimension de-risks the implementation significantly — data quality and integration issues are the most common causes of Phase 1 delays in Anaplan programmes.',
+        insight: 'With strong data foundations, the primary Data Hub design decision is granularity: at what level should actuals be loaded, and at what level should the planning process operate? Getting this right at design time avoids a costly retrospective change to the model dimensionality.',
+        insightCol: '#1A7F8A'
+      }
+    },
+    'Governance & People': {
+      low: {
+        text: 'Internal capability and process governance are at an early stage, which creates a clear and well-documented risk for Anaplan implementations. Per BARC Planning Survey 2025, organisations without an internal Centre of Excellence consistently struggle to scale Anaplan beyond initial use cases. The three failure modes documented in multiple public case studies are: low user adoption due to insufficient change management, fragmented model ownership creating technical debt, and partner dependency that prevents agile enhancement.',
+        insight: 'The COE build programme is not an optional investment — it is a total cost of ownership item. A partner-led implementation without a parallel internal capability build will result in permanently elevated support costs and a model that cannot be enhanced at the speed the business requires.',
+        insightCol: '#7047A3'
+      },
+      mid: {
+        text: 'Internal capability exists in embryonic form, which provides a foundation to build from during the implementation. The recommended model is partner-led delivery with active internal co-build — where internal team members participate in sprint development, not just user acceptance testing. This is the skills transfer mechanism. Per The Anaplan Way, at least two client team members should achieve Official Anaplanner status during the implementation programme.',
+        insight: 'The internal Model Builder identified before sprint 1 should own at least one module by the end of Phase 1 — built with partner guidance, not by the partner alone. This is the difference between training and capability building. The former produces a certificate; the latter produces a functional COE.',
+        insightCol: '#7047A3'
+      },
+      high: {
+        text: 'An established internal planning capability or COE represents a significant competitive advantage for an Anaplan implementation. It accelerates delivery, reduces partner dependency, and creates the feedback loops necessary for continuous improvement post-go-live. At this governance maturity level, the partner role should shift from primary developer to architecture reviewer, quality assurer, and specialist adviser — not the team doing the work.',
+        insight: 'With a mature COE, the primary governance design investment is ALM (Application Lifecycle Management) — specifically, a rigorous revision tag and model sync discipline that prevents the DEV-PROD drift that degrades model quality over time. Anapedia documents this architecture in detail.',
+        insightCol: '#7047A3'
+      }
+    }
+  };
+
+  const tier = score < 34 ? 'low' : score < 67 ? 'mid' : 'high';
+  return narratives[dimKey] ? narratives[dimKey][tier] : null;
+}
+
+function getReadinessMatrix() {
+  const ds = {};
+  Object.keys(DIMS).forEach(k => { ds[k] = getDimScore(k) ?? 0; });
+
+  const toRag = (score) => score < 34 ? 'red' : score < 67 ? 'amber' : 'green';
+  const ragLabel = (score) => score < 34 ? 'Not Ready' : score < 67 ? 'Conditional' : 'Ready';
+
+  const currentStateMap = {
+    'Demand Process': {
+      low: 'Excel-driven, no consensus process, no accuracy tracking',
+      mid: 'Statistical baseline exists, consensus inconsistent',
+      high: 'Consensus process established, accuracy tracked systematically'
+    },
+    'Supply Process': {
+      low: 'Reactive, no capacity plan, ad hoc disruption response',
+      mid: 'Capacity planning in place, limited scenario capability',
+      high: 'Constrained planning, scenario modelling embedded in cycle'
+    },
+    'Financial Integration': {
+      low: 'Finance and operations plan independently, no connection',
+      mid: 'Manual translation at period end, days of lag',
+      high: 'Near real-time P&L visibility from operational plan'
+    },
+    'Data Infrastructure': {
+      low: 'Significant data quality issues, complex integration architecture',
+      mid: 'Partial data quality, integration feasible with investment',
+      high: 'Clean master data, integration path clear'
+    },
+    'Governance & People': {
+      low: 'No internal capability, informal processes only',
+      mid: 'Emerging capability, some process structure',
+      high: 'Established COE, governed process'
+    }
+  };
+
+  const primaryGapMap = {
+    'Demand Process': {
+      low: 'Process and cadence before technology',
+      mid: 'MAPE tracking and override accountability',
+      high: 'Exception automation and AI agent integration'
+    },
+    'Supply Process': {
+      low: 'Demand planning stability as prerequisite',
+      mid: 'Structured scenario management tooling',
+      high: 'Constrained optimisation architecture'
+    },
+    'Financial Integration': {
+      low: 'Organisational alignment and joint planning calendar',
+      mid: 'Volume-to-value translation module design',
+      high: 'IBP executive review architecture'
+    },
+    'Data Infrastructure': {
+      low: 'Master data cleanse and middleware investment',
+      mid: 'Integration architecture scoping and budget',
+      high: 'Data Hub dimensionality and load frequency design'
+    },
+    'Governance & People': {
+      low: 'COE build programme from sprint 1',
+      mid: 'Internal co-build and ALM ownership',
+      high: 'Architecture review and quality governance'
+    }
+  };
+
+  return Object.entries(ds).map(([k, score]) => {
+    const tier = score < 34 ? 'low' : score < 67 ? 'mid' : 'high';
+    return {
+      name: k,
+      col: DIMS[k].col,
+      score,
+      rag: toRag(score),
+      ragLabel: ragLabel(score),
+      currentState: currentStateMap[k][tier],
+      primaryGap: primaryGapMap[k][tier]
+    };
+  });
+}
+
+function getActionPlan(pmi, blockers, flags) {
+  const hasBlocker = blockers.filter(b => b.type === 'hard').length > 0;
+  const ds = {};
+  Object.keys(DIMS).forEach(k => { ds[k] = getDimScore(k) ?? 0; });
+
+  const thirtyDays = [];
+  const sixtyDays = [];
+  const ninetyDays = [];
+
+  if (hasBlocker) {
+    thirtyDays.push('Initiate master data quality audit — classify, quantify, and assign ownership of data remediation');
+    thirtyDays.push('Convene a planning governance workshop to define process structure before any technology evaluation');
+    thirtyDays.push('Identify internal planning transformation sponsor with budget authority');
+    sixtyDays.push('Complete data remediation for priority domains — product master as minimum viable baseline');
+    sixtyDays.push('Define joint Finance-Operations planning calendar and agree pilot cycle cadence');
+    sixtyDays.push('Document current-state process maps for demand, supply, and financial planning');
+    ninetyDays.push('Reassess readiness using Orion — validate that critical blockers are resolved');
+    ninetyDays.push('Initiate Anaplan platform evaluation with EyeOn — now with a defensible foundation');
+    ninetyDays.push('Define COE resourcing model — confirm internal Model Builder candidate');
+  } else {
+    thirtyDays.push('Conduct ERP integration architecture review — confirm CloudWorks path or middleware requirement');
+    thirtyDays.push('Identify and confirm internal Model Builder candidate for co-build programme');
+    thirtyDays.push(ds['Data Infrastructure'] < 50
+      ? 'Begin master data quality assessment — catalogue known issues and assign remediation ownership'
+      : 'Validate that existing ERP extracts produce the data sets required for Anaplan Data Hub build');
+    thirtyDays.push('Engage EyeOn for a scoped discovery engagement to validate this assessment against your specific landscape');
+
+    sixtyDays.push('Complete integration architecture decision — CloudWorks native vs middleware — with documented cost');
+    sixtyDays.push('Finalise Phase 1 scope: Data Hub data sets, Demand Planning application, PlanIQ algorithm selection');
+    sixtyDays.push('Define COE build programme milestones and internal training plan');
+    sixtyDays.push(ds['Financial Integration'] < 40
+      ? 'Run Finance-Operations alignment workshop — agree joint planning calendar before FP&A scope is added'
+      : 'Validate FP&A integration design with Finance team — confirm management P&L structure for Anaplan');
+
+    ninetyDays.push('Complete Phase 1 design sprint — Data Hub data model, module structure, integration architecture');
+    ninetyDays.push('Sprint 1 kick-off: Data Hub build commences, internal co-build model builder onboarded');
+    ninetyDays.push('Establish ALM environment — DEV and PROD models, revision tag discipline from sprint 1');
+    ninetyDays.push('Baseline demand forecast agreed — first planning cycle target set for MAPE measurement');
+  }
+
+  return { thirtyDays, sixtyDays, ninetyDays };
+}
+
+function getCompetitiveContext(pmi) {
+  const scope = answers['q1'];
+  const users = answers['q2'];
+  const erpSystem = answers['q11'];
+  const ds = {};
+  Object.keys(DIMS).forEach(k => { ds[k] = getDimScore(k) ?? 0; });
+
+  const rows = [];
+
+  // Anaplan
+  const anaplanVerdict = pmi < 20 ? 'notfit' : pmi < 35 ? 'secondary' : 'primary';
+  const anaplanReason = pmi < 35
+    ? 'Strong long-term fit but process and data maturity prerequisites must be met first. Connected planning architecture is the right direction for your scope.'
+    : 'Primary recommendation. Connected planning across Supply Chain, Finance, and Sales on a single platform aligns directly with your scope and maturity profile.';
+  rows.push({name:'Anaplan', reason: anaplanReason, verdict: anaplanVerdict, vLabel: pmi < 20 ? 'Premature' : pmi < 35 ? 'Conditional' : 'Recommended'});
+
+  // SAP IBP
+  const ibpReason = erpSystem === 'B'
+    ? 'Relevant if you are committing to a full SAP S/4HANA roadmap. Native integration is a real advantage but only if S/4HANA is your ERP direction. Supply chain focused — weaker on Finance-SC alignment.'
+    : erpSystem === 'A'
+    ? 'SAP IBP\'s primary advantage is native S/4HANA integration, which does not apply to an ECC 6.0 environment. The integration effort to SAP IBP from ECC is comparable to or greater than Anaplan.'
+    : 'Supply chain focused with strong S/4HANA integration. If your ERP is not SAP or your scope includes Finance-SC alignment as a priority, Anaplan\'s connected planning model is a stronger fit.';
+  const ibpVerdict = erpSystem === 'B' ? 'secondary' : 'notfit';
+  rows.push({name:'SAP IBP', reason: ibpReason, verdict: ibpVerdict, vLabel: erpSystem === 'B' ? 'Consider if SAP-committed' : 'Not recommended'});
+
+  // Pigment
+  const pigmentReason = users === 'A' || users === 'B'
+    ? 'Strong mid-market fit for smaller planning populations with simpler data models and faster deployment requirements. Does not have PlanIQ-equivalent statistical forecasting depth for complex demand patterns.'
+    : ds['Demand Process'] > 50
+    ? 'Competitive modern UX and faster time-to-value for mid-market. At your demand planning maturity level, Anaplan\'s PlanIQ statistical forecasting capability and performance at scale is a meaningful differentiator.'
+    : 'Modern UX and faster initial deployment. For organisations prioritising speed over depth at Stage 1-2 maturity, Pigment is a credible alternative. Anaplan\'s advantage is connected planning breadth and enterprise scalability.';
+  const pigmentVerdict = (users === 'A' || pmi < 35) ? 'secondary' : 'notfit';
+  rows.push({name:'Pigment', reason: pigmentReason, verdict: pigmentVerdict, vLabel: users === 'A' ? 'Alternative for small teams' : 'Not recommended at this scale'});
+
+  // Workday Adaptive
+  const adaptiveReason = scope === 'A'
+    ? 'Relevant for a Finance-only scope in mid-market organisations. Simpler model building with lower total cost, but limited supply chain capability. If Finance-only scope is permanent, Adaptive is worth evaluating alongside Anaplan.'
+    : 'Finance-primary platform with limited supply chain capability. If your scope includes Supply Chain planning now or in the future, Adaptive does not address your full requirements.';
+  const adaptiveVerdict = scope === 'A' ? 'secondary' : 'notfit';
+  rows.push({name:'Workday Adaptive', reason: adaptiveReason, verdict: adaptiveVerdict, vLabel: scope === 'A' ? 'Consider for Finance-only' : 'Not recommended'});
+
+  return rows;
+}
+
+/* ══════════════════════════════════════════════
+   REPORT BUILDER
+══════════════════════════════════════════════ */
+function buildReport() {
+  showScreen('report');
+  sequence = getSequence();
+
+  const pmi = getPMI();
+  const band = getBand(pmi);
+  const blockers = getCriticalBlockers();
+  const flags = getFlags();
+  const fit = getToolFit(blockers, flags);
+  const caps = getCapabilities();
+  const roadmap = getRoadmap(blockers);
+  const execSummary = getExecSummary(pmi, band, blockers, flags, fit);
+  const readiness = getReadinessMatrix();
+  const actionPlan = getActionPlan(pmi, blockers, flags);
+  const competitive = getCompetitiveContext(pmi);
+
+  // ── Animate gauge ──
+  const gaugeArc = document.getElementById('gauge-arc');
+  const gaugeNum = document.getElementById('gauge-num');
+  const gaugeLabel = document.getElementById('gauge-label');
+  const circumference = 2 * Math.PI * 48;
+  const pmiCol = pmi <= 25 ? '#B82E2E' : pmi <= 45 ? '#BF801E' : pmi <= 65 ? '#175AA6' : '#217348';
+
+  setTimeout(() => {
+    const dash = (pmi / 100) * circumference;
+    gaugeArc.setAttribute('stroke-dasharray', dash + ' ' + circumference);
+    gaugeArc.setAttribute('stroke', pmiCol);
+    let n = 0;
+    const step = setInterval(() => {
+      n = Math.min(n + Math.ceil(pmi / 30), pmi);
+      gaugeNum.textContent = n;
+      if (n >= pmi) clearInterval(step);
+    }, 40);
+  }, 200);
+
+  gaugeLabel.textContent = band.label;
+  gaugeLabel.style.background = band.badgeBg + '22';
+  gaugeLabel.style.color = band.badgeBg;
+  gaugeLabel.style.border = '1px solid ' + band.badgeBg + '44';
+
+  const scope = {A:'Finance Planning',B:'Supply Chain Planning',C:'Cross-Functional Connected Planning',D:'Scope TBD'}[answers['q1']] || 'Planning Transformation';
+  document.getElementById('r-meta').textContent =
+    scope + ' \u00B7 ' + new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'});
+
+  const dimEntries = Object.entries(DIMS).map(([k, cfg]) => ({name:k, score:getDimScore(k) ?? 0, col:cfg.col}));
+
+  let html = '';
+
+  // ── 1. EXECUTIVE SUMMARY ──
+  html += '<div class="r-section-label" style="margin-top:0">Executive Summary</div>';
+  html += '<div class="exec-summary">';
+  html += '<div class="exec-summary-label">Orion Assessment — Overall Findings</div>';
+  execSummary.forEach(p => { html += `<p>${p}</p>`; });
+  html += '</div>';
+
+  // ── 2. FIT VERDICT ──
+  html += '<div class="r-section-label">Anaplan Fit Verdict</div>';
+  html += `<div class="fit-card ${fit.verdict}">
+    <div class="fit-verdict-header">
+      <div class="fit-verdict-icon">${fit.icon}</div>
+      <div class="fit-verdict-title">${fit.title}</div>
+    </div>
+    <div class="fit-verdict-body">${fit.body}</div>
+  </div>`;
+
+  // ── 3. READINESS MATRIX ──
+  html += '<div class="r-section-label">Planning Readiness Matrix</div>';
+  html += `<div class="readiness-matrix">
+    <div class="rm-header">
+      <div class="rm-header-cell">Dimension</div>
+      <div class="rm-header-cell">Current State</div>
+      <div class="rm-header-cell">Primary Gap</div>
+      <div class="rm-header-cell">Readiness</div>
+    </div>`;
+  readiness.forEach(r => {
+    html += `<div class="rm-row">
+      <div class="rm-cell">
+        <div class="rm-dim-cell">
+          <div class="rm-dim-dot" style="background:${r.col}"></div>
+          <div>
+            <div class="rm-dim-name">${r.name}</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:1px">${r.score}/100</div>
+          </div>
+        </div>
+      </div>
+      <div class="rm-cell">${r.currentState}</div>
+      <div class="rm-cell">${r.primaryGap}</div>
+      <div class="rm-cell"><span class="rag ${r.rag}">${r.ragLabel}</span></div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // ── 4. DIMENSION DEEP-DIVES ──
+  html += '<div class="r-section-label">Dimension Analysis</div>';
+  dimEntries.forEach(d => {
+    const narr = getDimNarrative(d.name, d.score);
+    const stageLabel = d.score < 34 ? 'Stage 1\u20132 \u00B7 Reactive\u2013Developing' : d.score < 67 ? 'Stage 2\u20133 \u00B7 Developing\u2013Connected' : 'Stage 3\u20134 \u00B7 Connected\u2013Optimising';
+    if (!narr) return;
+    html += `<div class="dim-deep">
+      <div class="dim-deep-header">
+        <div class="dim-deep-left">
+          <div class="dim-deep-swatch" style="background:${d.col}"></div>
+          <div>
+            <div class="dim-deep-name">${d.name}</div>
+            <div class="dim-deep-stage">${stageLabel}</div>
+          </div>
+        </div>
+        <div class="dim-deep-right">
+          <div class="dim-deep-score" style="color:${d.col}">${d.score}</div>
+          <div class="dim-bar-wrap">
+            <div class="dim-bar-track" style="margin-top:5px">
+              <div class="dim-bar-fill" style="width:0%;background:${d.col}" data-target="${d.score}"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="dim-deep-body">
+        <div class="dim-narrative">${narr.text}</div>
+        <div class="dim-insight" style="border-color:${narr.insightCol}">
+          <div>
+            <div class="dim-insight-label" style="color:${narr.insightCol}">Implementation Insight</div>
+            <div class="dim-insight-text">${narr.insight}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  // ── 5. BLOCKERS ──
+  if (blockers.length > 0) {
+    html += '<div class="r-section-label">Critical Conditions \u2014 Resolve Before Implementation</div>';
+    blockers.forEach(b => {
+      html += `<div class="flag-card hard">
+        <div class="flag-icon-wrap">&#128308;</div>
+        <div>
+          <div class="flag-title">${b.title}</div>
+          <div class="flag-body">${b.body}</div>
+          <div class="flag-source">${b.source}</div>
+        </div>
+      </div>`;
+    });
+  }
+
+  // ── 6. FLAGS ──
+  if (flags.length > 0) {
+    html += '<div class="r-section-label">Flagged Considerations</div>';
+    flags.forEach(f => {
+      const icon = f.type === 'hard' ? '&#128308;' : f.type === 'soft' ? '&#9888;' : 'ℹ️';
+      html += `<div class="flag-card ${f.type}">
+        <div class="flag-icon-wrap">${icon}</div>
+        <div>
+          <div class="flag-title">${f.title}</div>
+          <div class="flag-body">${f.body}</div>
+          <div class="flag-source">${f.source}</div>
+        </div>
+      </div>`;
+    });
+  }
+
+  // ── 7. CAPABILITIES ──
+  html += '<div class="r-section-label">Recommended Anaplan Capabilities \u2014 Prioritised</div>';
+  caps.forEach(c => {
+    const tagCls = c.phase === 'pre' ? 'pre' : c.phase === 'p2' ? 'p2' : c.phase === 'par' ? 'par' : 'p1';
+    const goodLooks = c.goodLooks || null;
+    const depNote = c.dependency || null;
+    html += `<div class="cap-card">
+      <div class="cap-card-header">
+        <div class="cap-name">${c.name}</div>
+        <span class="cap-phase ${tagCls}">${c.tag}</span>
+      </div>
+      <div class="cap-body">${c.body}</div>
+      <div class="cap-detail">${c.detail}</div>
+      ${goodLooks ? `<div class="cap-what-good"><div class="cap-what-good-label">What good looks like</div><div class="cap-what-good-text">${goodLooks}</div></div>` : ''}
+      ${depNote ? `<div class="cap-dependency"><div class="cap-dep-label">Depends on</div><div class="cap-dep-text">${depNote}</div></div>` : ''}
+      <div class="cap-source">${c.source}</div>
+    </div>`;
+  });
+
+  // ── 8. ROADMAP ──
+  html += '<div class="r-section-label">Implementation Roadmap</div>';
+  html += '<div class="roadmap">';
+  roadmap.forEach(p => {
+    const pillsHtml = (p.pills || []).map(pill => `<span class="phase-pill">${pill}</span>`).join('');
+    const depHtml = p.dependsOn ? `<div class="phase-dep">${p.dependsOn}</div>` : '';
+    html += `<div class="phase-row">
+      <div class="phase-num-badge" style="background:${p.col}">${p.num}</div>
+      <div class="phase-content">
+        <div class="phase-title">${p.title}</div>
+        <div class="phase-meta">${p.meta}</div>
+        <div class="phase-items">${p.items.map(i => `<div class="phase-item">${i}</div>`).join('')}</div>
+        ${p.pills || p.dependsOn ? `<div class="phase-effort-row">${pillsHtml}</div>${depHtml}` : ''}
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // ── 9. 30/60/90 ACTION PLAN ──
+  html += '<div class="r-section-label">30 / 60 / 90 Day Action Plan</div>';
+  html += '<div class="action-plan">';
+
+  const cols = [
+    {days:'30 days', theme:'Foundation & Validation', col:'#175AA6', items: actionPlan.thirtyDays},
+    {days:'60 days', theme:'Design & Scoping', col:'#BF801E', items: actionPlan.sixtyDays},
+    {days:'90 days', theme:'Implementation Readiness', col:'#217348', items: actionPlan.ninetyDays},
+  ];
+  cols.forEach(c => {
+    html += `<div class="action-col">
+      <div class="action-col-header" style="border-top:3px solid ${c.col}">
+        <div class="action-timeframe" style="color:${c.col}">${c.days}</div>
+        <div class="action-theme">${c.theme}</div>
+      </div>
+      <div class="action-items">
+        ${c.items.map(i => `<div class="action-item">${i}</div>`).join('')}
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // ── 10. COMPETITIVE CONTEXT ──
+  html += '<div class="r-section-label">Competitive Platform Context</div>';
+  html += '<div class="competitive-box">';
+  competitive.forEach(r => {
+    html += `<div class="comp-row">
+      <div class="comp-name">${r.name}</div>
+      <div class="comp-reason">${r.reason}</div>
+      <div class="comp-verdict ${r.verdict}">${r.vLabel}</div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // ── 11. SOURCES ──
+  html += '<div class="r-section-label">Assessment Sources</div>';
+  html += `<div class="sources-box">
+    <p>All findings in this report are sourced to named public frameworks and documentation. <strong>Maturity stage definitions:</strong> Gartner Five-Stage S&OP Maturity Model (React, Anticipate, Integrate, Collaborate, Orchestrate) — publicly available via Consumer Goods Technology and Gartner research publications. <strong>Capability prerequisites and integration architecture:</strong> Anapedia, Anaplan's public technical documentation (help.anaplan.com). <strong>Implementation sequencing:</strong> The Anaplan Way, Anaplan's public project methodology. <strong>COE and governance benchmarks:</strong> BARC Planning Survey 2025 and Anaplan Community public case studies including the Edwards Lifesciences COE case study (B EYE, 2025). <strong>Financial integration framework:</strong> Oliver Wight IBP Framework, widely published in supply chain management literature. <strong>PlanIQ algorithm selection:</strong> Anapedia PlanIQ documentation including forecast horizon calculations and algorithm properties. No proprietary client data or commercially sensitive implementation detail is referenced anywhere in this assessment.</p>
+  </div>`;
+
+  document.getElementById('report-content').innerHTML = html;
+
+  // Animate bars after render
+  setTimeout(() => {
+    document.querySelectorAll('.dim-bar-fill').forEach(el => {
+      el.style.width = el.getAttribute('data-target') + '%';
+    });
+  }, 300);
+}
+
+function restart() {
+  answers = {}; currentIdx = 0;
+  showScreen('intro');
+}
+
+/* ══════════════════════════════════════════════
+   PDF EXPORT
+══════════════════════════════════════════════ */
+function showPdfToast(msg) {
+  const t = document.getElementById('pdf-toast');
+  t.textContent = msg;
+  t.classList.add('visible');
+}
+function hidePdfToast() {
+  document.getElementById('pdf-toast').classList.remove('visible');
+}
+
+async function exportPDF() {
+  const btn = document.getElementById('btn-pdf');
+  btn.disabled = true;
+  btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="animation:spin 1s linear infinite"><circle cx="8" cy="8" r="6" stroke="white" stroke-width="1.5" stroke-dasharray="20 18" stroke-linecap="round"/></svg> Generating…`;
+
+  showPdfToast('Preparing your report — this may take a few seconds…');
+
+  try {
+    const { jsPDF } = window.jspdf;
+
+    // Hide the action bar and footer from the capture so they don't appear in PDF
+    const actionBar = document.querySelector('.report-action-bar');
+    const footer    = document.querySelector('.report-footer');
+    actionBar.style.display = 'none';
+    footer.style.display    = 'none';
+
+    // Capture the entire report screen as ONE continuous canvas
+    const reportEl = document.getElementById('screen-report');
+    const scale    = 2;
+    const PDF_W_PX = 1240; // matches ~A4 at 150dpi
+
+    const fullCanvas = await html2canvas(reportEl, {
+      scale,
+      useCORS:     true,
+      logging:     false,
+      backgroundColor: '#FAF8F0',
+      windowWidth: PDF_W_PX,
+      scrollX: 0,
+      scrollY: -window.scrollY,
+      width:  reportEl.scrollWidth,
+      height: reportEl.scrollHeight,
+    });
+
+    // Restore hidden elements
+    actionBar.style.display = '';
+    footer.style.display    = '';
+
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit:        'mm',
+      format:      'a4',
+    });
+
+    const PAGE_W  = 210; // A4 width mm
+    const PAGE_H  = 297; // A4 height mm
+
+    const canvasW = fullCanvas.width;  // pixels at 2× scale
+    const canvasH = fullCanvas.height;
+
+    // mm per canvas pixel (un-scaled)
+    const mmPerPx = PAGE_W / (canvasW / scale);
+    const totalMmH = (canvasH / scale) * mmPerPx;
+
+    let yMm = 0; // mm position into total canvas height
+    let isFirstPage = true;
+
+    while (yMm < totalMmH) {
+      if (!isFirstPage) pdf.addPage();
+      isFirstPage = false;
+
+      // How many mm fill this page (last page may be shorter)
+      const sliceMmH = Math.min(PAGE_H, totalMmH - yMm);
+
+      // Canvas pixel coordinates for this slice
+      const srcY = Math.round((yMm  / mmPerPx) * scale);
+      const srcH = Math.round((sliceMmH / mmPerPx) * scale);
+
+      // Draw just this slice into a temporary canvas
+      const sliceCanvas        = document.createElement('canvas');
+      sliceCanvas.width        = canvasW;
+      sliceCanvas.height       = Math.max(1, srcH);
+      const ctx                = sliceCanvas.getContext('2d');
+      // Fill background first to avoid transparent strips
+      ctx.fillStyle = '#FAF8F0';
+      ctx.fillRect(0, 0, canvasW, sliceCanvas.height);
+      ctx.drawImage(fullCanvas, 0, srcY, canvasW, srcH, 0, 0, canvasW, srcH);
+
+      const imgData = sliceCanvas.toDataURL('image/jpeg', 0.94);
+      pdf.addImage(imgData, 'JPEG', 0, 0, PAGE_W, sliceMmH);
+
+      yMm += PAGE_H; // always advance a full page (last slice is shorter but next iteration exits)
+    }
+
+    const datePart = new Date().toISOString().slice(0, 10);
+    pdf.save(`Orion-Report-${datePart}.pdf`);
+
+    showPdfToast('Report downloaded ✓');
+    setTimeout(hidePdfToast, 2800);
+
+  } catch (err) {
+    console.error(err);
+    // Ensure elements are restored even on error
+    const ab = document.querySelector('.report-action-bar');
+    const ft = document.querySelector('.report-footer');
+    if (ab) ab.style.display = '';
+    if (ft) ft.style.display = '';
+    showPdfToast('Export failed — please try again');
+    setTimeout(hidePdfToast, 3000);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 12h10M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Export PDF`;
+  }
+}
+</script>
+</body>
+</html>
